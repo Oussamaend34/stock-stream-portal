@@ -1,60 +1,51 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export interface User {
+export interface Client {
   id?: number;
-  email: string;
   name: string;
+  email: string;
   phone: string;
   address: string;
-  cin: string;
-  role?: string; // Make role optional since the API doesn't accept it
-  password?: string;
 }
 
-interface UserFormProps {
+interface ClientFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (user: User) => void;
-  user?: User;
+  onSubmit: (client: Client) => void;
+  client?: Client;
   mode: 'create' | 'edit';
 }
 
-const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) => {
-  const [formData, setFormData] = useState<User>({
-    email: '',
+const ClientForm = ({ open, onOpenChange, onSubmit, client, mode }: ClientFormProps) => {
+  const [formData, setFormData] = useState<Client>({
     name: '',
+    email: '',
     phone: '',
     address: '',
-    cin: '',
-    password: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Initialize form with user data when editing
-    if (user && mode === 'edit') {
-      setFormData(user);
+    // Initialize form with client data when editing
+    if (client && mode === 'edit') {
+      setFormData(client);
     } else {
       // Reset form for create mode
       setFormData({
-        email: '',
         name: '',
+        email: '',
         phone: '',
         address: '',
-        cin: '',
-        password: ''
       });
     }
-  }, [user, mode, open]);
+  }, [client, mode, open]);
 
-  const handleChange = (field: keyof User, value: string) => {
+  const handleChange = (field: keyof Client, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field
     if (errors[field]) {
@@ -68,41 +59,32 @@ const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) =
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       newErrors.email = 'Email is not valid';
     }
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-
+    
     if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone is required';
+      newErrors.phone = 'Phone number is required';
     }
-
+    
     if (!formData.address.trim()) {
       newErrors.address = 'Address is required';
     }
-
-    if (!formData.cin.trim()) {
-      newErrors.cin = 'CIN is required';
-    }
-
-    // Password is required only in create mode
-    if (mode === 'create' && !formData.password?.trim()) {
-      newErrors.password = 'Password is required';
-    }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (validateForm()) {
       onSubmit(formData);
     }
@@ -113,11 +95,25 @@ const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) =
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'Create New User' : 'Edit User'}
+            {mode === 'create' ? 'Create New Client' : 'Edit Client'}
           </DialogTitle>
         </DialogHeader>
-
+        
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              placeholder="Enter client name"
+              className={errors.name ? 'border-red-500' : ''}
+            />
+            {errors.name && (
+              <p className="text-xs text-red-500">{errors.name}</p>
+            )}
+          </div>
+          
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -125,46 +121,14 @@ const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) =
               type="email"
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value)}
-              placeholder="Enter email"
+              placeholder="Enter email address"
               className={errors.email ? 'border-red-500' : ''}
-              disabled={mode === 'edit'} // Email cannot be changed in edit mode
             />
             {errors.email && (
               <p className="text-xs text-red-500">{errors.email}</p>
             )}
           </div>
-
-          {mode === 'create' && (
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-                placeholder="Enter password"
-                className={errors.password ? 'border-red-500' : ''}
-              />
-              {errors.password && (
-                <p className="text-xs text-red-500">{errors.password}</p>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="Enter name"
-              className={errors.name ? 'border-red-500' : ''}
-            />
-            {errors.name && (
-              <p className="text-xs text-red-500">{errors.name}</p>
-            )}
-          </div>
-
+          
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
             <Input
@@ -178,35 +142,21 @@ const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) =
               <p className="text-xs text-red-500">{errors.phone}</p>
             )}
           </div>
-
+          
           <div className="space-y-2">
             <Label htmlFor="address">Address</Label>
             <Input
               id="address"
               value={formData.address}
               onChange={(e) => handleChange('address', e.target.value)}
-              placeholder="Enter address"
+              placeholder="Enter full address"
               className={errors.address ? 'border-red-500' : ''}
             />
             {errors.address && (
               <p className="text-xs text-red-500">{errors.address}</p>
             )}
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="cin">CIN</Label>
-            <Input
-              id="cin"
-              value={formData.cin}
-              onChange={(e) => handleChange('cin', e.target.value)}
-              placeholder="Enter CIN"
-              className={errors.cin ? 'border-red-500' : ''}
-            />
-            {errors.cin && (
-              <p className="text-xs text-red-500">{errors.cin}</p>
-            )}
-          </div>
-
+          
           <DialogFooter className="sm:justify-end">
             <Button 
               type="button" 
@@ -215,8 +165,8 @@ const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) =
             >
               Cancel
             </Button>
-            <Button type="submit">
-              {mode === 'create' ? 'Create User' : 'Update User'}
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+              {mode === 'create' ? 'Create Client' : 'Update Client'}
             </Button>
           </DialogFooter>
         </form>
@@ -225,4 +175,4 @@ const UserForm = ({ open, onOpenChange, onSubmit, user, mode }: UserFormProps) =
   );
 };
 
-export default UserForm;
+export default ClientForm;

@@ -21,8 +21,8 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { Warehouse as WarehouseIcon, Edit, Trash2, MoreHorizontal, Search, Plus, Loader2 } from 'lucide-react';
-import WarehouseForm, { Warehouse } from '@/components/WarehouseForm';
+import { UserCircle, Edit, Trash2, MoreHorizontal, Search, Plus, Loader2, Mail, Phone, MapPin } from 'lucide-react';
+import ClientForm, { Client } from '@/components/ClientForm';
 import { toast } from 'sonner';
 import { 
   AlertDialog,
@@ -35,90 +35,91 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { warehouseApi } from '@/lib/api';
+import { clientApi } from '@/lib/api';
 
-const WarehouseManagement = () => {
+const ClientManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [currentWarehouse, setCurrentWarehouse] = useState<Warehouse | undefined>(undefined);
+  const [currentClient, setCurrentClient] = useState<Client | undefined>(undefined);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
 
   const queryClient = useQueryClient();
 
-  // Fetch warehouses
-  const { data: warehouses = [], isLoading, isError } = useQuery({
-    queryKey: ['warehouses'],
+  // Fetch clients
+  const { data: clients = [], isLoading, isError } = useQuery({
+    queryKey: ['clients'],
     queryFn: async () => {
-      const response = await warehouseApi.getAll();
+      const response = await clientApi.getAll();
       return response.data;
     }
   });
 
-  // Create warehouse mutation - without global success handlers to avoid duplicate notifications
-  const createWarehouseMutation = useMutation({
-    mutationFn: (warehouseData: Warehouse) => warehouseApi.create(warehouseData),
+  // Create client mutation - without global success handlers to avoid duplicate notifications
+  const createClientMutation = useMutation({
+    mutationFn: (clientData: Client) => clientApi.create(clientData),
     meta: {
       // Add a meta tag to indicate this mutation should only show notifications in its specific handler
       notificationsHandledInCallback: true
     }
   });
 
-  // Update warehouse mutation - without global success handlers to avoid duplicate notifications
-  const updateWarehouseMutation = useMutation({
-    mutationFn: ({ id, warehouseData }: { id: number, warehouseData: Warehouse }) => 
-      warehouseApi.update(id, warehouseData),
+  // Update client mutation - without global success handlers to avoid duplicate notifications
+  const updateClientMutation = useMutation({
+    mutationFn: ({ id, clientData }: { id: number, clientData: Client }) => 
+      clientApi.update(id, clientData),
     meta: {
       // Add a meta tag to indicate this mutation should only show notifications in its specific handler
       notificationsHandledInCallback: true
     }
   });
 
-  // Delete warehouse mutation - without global success handlers to avoid duplicate notifications
-  const deleteWarehouseMutation = useMutation({
-    mutationFn: (id: number) => warehouseApi.delete(id),
+  // Delete client mutation - without global success handlers to avoid duplicate notifications
+  const deleteClientMutation = useMutation({
+    mutationFn: (id: number) => clientApi.delete(id),
     meta: {
       // Add a meta tag to indicate this mutation should only show notifications in its specific handler
       notificationsHandledInCallback: true
     }
   });
 
-  const filteredWarehouses = warehouses.filter(warehouse => 
-    warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    warehouse.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    warehouse.code.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredClients = clients.filter(client => 
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.address.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleCreate = () => {
     setFormMode('create');
-    setCurrentWarehouse(undefined);
+    setCurrentClient(undefined);
     setFormOpen(true);
   };
 
-  const handleEdit = (warehouse: Warehouse) => {
+  const handleEdit = (client: Client) => {
     setFormMode('edit');
-    setCurrentWarehouse(warehouse);
+    setCurrentClient(client);
     setFormOpen(true);
   };
 
-  const handleDeleteIntent = (warehouse: Warehouse) => {
-    setCurrentWarehouse(warehouse);
+  const handleDeleteIntent = (client: Client) => {
+    setCurrentClient(client);
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = () => {
-    if (currentWarehouse && currentWarehouse.id) {
-      deleteWarehouseMutation.mutate(currentWarehouse.id, {
+    if (currentClient && currentClient.id) {
+      deleteClientMutation.mutate(currentClient.id, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for warehouse deletion should be triggered
-          toast.success(`Warehouse ${currentWarehouse.name} has been deleted`);
+          // IMPORTANT: This is the ONLY place where toast notifications for client deletion should be triggered
+          toast.success(`Client ${currentClient.name} has been deleted`);
           setDeleteDialogOpen(false);
           
           // Invalidate queries to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+          queryClient.invalidateQueries({ queryKey: ['clients'] });
         },
         onError: (error) => {
-          toast.error(`Failed to delete warehouse: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(`Failed to delete client: ${error instanceof Error ? error.message : 'Unknown error'}`);
         },
         // This is crucial - it ensures no other handlers will run
         onSettled: () => {
@@ -128,37 +129,37 @@ const WarehouseManagement = () => {
     }
   };
 
-  const handleFormSubmit = (warehouse: Warehouse) => {
+  const handleFormSubmit = (client: Client) => {
     if (formMode === 'create') {
-      createWarehouseMutation.mutate(warehouse, {
+      createClientMutation.mutate(client, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for warehouse creation should be triggered
-          toast.success(`Warehouse ${warehouse.name} has been created`);
+          // IMPORTANT: This is the ONLY place where toast notifications for client creation should be triggered
+          toast.success(`Client ${client.name} has been created`);
           setFormOpen(false);
           
           // Invalidate queries to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+          queryClient.invalidateQueries({ queryKey: ['clients'] });
         },
         onError: (error) => {
-          toast.error(`Failed to create warehouse: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(`Failed to create client: ${error instanceof Error ? error.message : 'Unknown error'}`);
         },
         // This is crucial - it ensures no other handlers will run
         onSettled: () => {
           // Any cleanup after creation
         }
       });
-    } else if (warehouse.id) {
-      updateWarehouseMutation.mutate({ id: warehouse.id, warehouseData: warehouse }, {
+    } else if (client.id) {
+      updateClientMutation.mutate({ id: client.id, clientData: client }, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for warehouse updates should be triggered
-          toast.success(`Warehouse ${warehouse.name} has been updated`);
+          // IMPORTANT: This is the ONLY place where toast notifications for client updates should be triggered
+          toast.success(`Client ${client.name} has been updated`);
           setFormOpen(false);
           
           // Invalidate queries to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+          queryClient.invalidateQueries({ queryKey: ['clients'] });
         },
         onError: (error) => {
-          toast.error(`Failed to update warehouse: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(`Failed to update client: ${error instanceof Error ? error.message : 'Unknown error'}`);
         },
         // This is crucial - it ensures no other handlers will run
         onSettled: () => {
@@ -173,26 +174,26 @@ const WarehouseManagement = () => {
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Warehouse Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Client Management</h1>
             <p className="text-muted-foreground">
-              Manage all your warehouse facilities
+              Manage your customer base and client information
             </p>
           </div>
-          <Button onClick={handleCreate} className="bg-warehouse-600 hover:bg-warehouse-700">
+          <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="mr-2 h-4 w-4" />
-            Add Warehouse
+            Add Client
           </Button>
         </div>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle>Warehouses</CardTitle>
+            <CardTitle>Clients</CardTitle>
             <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
               <div className="relative w-full">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search by name, address or code..."
+                  placeholder="Search by name, email, phone or address..."
                   className="w-full pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -207,39 +208,56 @@ const WarehouseManagement = () => {
                   <TableRow>
                     <TableHead className="w-[80px]">ID</TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Address</TableHead>
-                    <TableHead>Code</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={6} className="h-24 text-center">
                         <div className="flex justify-center items-center">
                           <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                          Loading warehouses...
+                          Loading clients...
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : isError ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-red-500">
-                        Error loading warehouses. Please try again.
+                      <TableCell colSpan={6} className="h-24 text-center text-red-500">
+                        Error loading clients. Please try again.
                       </TableCell>
                     </TableRow>
-                  ) : filteredWarehouses.length > 0 ? (
-                    filteredWarehouses.map((warehouse) => (
-                      <TableRow key={warehouse.id}>
-                        <TableCell className="font-medium">{warehouse.id}</TableCell>
+                  ) : filteredClients.length > 0 ? (
+                    filteredClients.map((client) => (
+                      <TableRow key={client.id}>
+                        <TableCell className="font-medium">{client.id}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <WarehouseIcon size={16} className="text-warehouse-600" />
-                            <span>{warehouse.name}</span>
+                            <UserCircle size={16} className="text-blue-600" />
+                            <span>{client.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell>{warehouse.address}</TableCell>
-                        <TableCell>{warehouse.code}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Mail size={14} className="text-gray-500" />
+                            <span>{client.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Phone size={14} className="text-gray-500" />
+                            <span>{client.phone}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={14} className="text-gray-500" />
+                            <span className="truncate max-w-[200px]">{client.address}</span>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -248,12 +266,12 @@ const WarehouseManagement = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(warehouse)}>
+                              <DropdownMenuItem onClick={() => handleEdit(client)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => handleDeleteIntent(warehouse)}
+                                onClick={() => handleDeleteIntent(client)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -266,8 +284,8 @@ const WarehouseManagement = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No warehouses found.
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        No clients found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -278,11 +296,11 @@ const WarehouseManagement = () => {
         </Card>
       </div>
 
-      <WarehouseForm 
+      <ClientForm 
         open={formOpen} 
         onOpenChange={setFormOpen} 
         onSubmit={handleFormSubmit} 
-        warehouse={currentWarehouse}
+        client={currentClient}
         mode={formMode} 
       />
 
@@ -291,7 +309,7 @@ const WarehouseManagement = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the warehouse <strong>{currentWarehouse?.name}</strong>.
+              This will permanently delete the client <strong>{currentClient?.name}</strong>.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -307,4 +325,4 @@ const WarehouseManagement = () => {
   );
 };
 
-export default WarehouseManagement;
+export default ClientManagement;

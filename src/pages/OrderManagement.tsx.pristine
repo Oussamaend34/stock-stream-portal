@@ -26,9 +26,7 @@ import {
   User,
   Download,
   ArrowLeft,
-  AlertTriangle,
-  X,
-  Plus
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -40,9 +38,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { orderApi, clientApi } from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { orderApi } from '@/lib/api';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Select,
   SelectContent,
@@ -50,33 +48,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { useForm, FormProvider, useFormContext, Controller } from "react-hook-form";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import CreateOrderForm from '@/components/CreateOrderForm';
 
 // Define the order data structure based on the DTO
 interface TransactionDetailsDTO {
   id: number;
+  productId: number;
   productName: string;
-  unit: string;
   quantity: number;
+  price: number;
 }
 
 interface OrderDTO {
@@ -85,38 +64,6 @@ interface OrderDTO {
   clientName: string;
   orderDate: string; // ISO date string format
   orderItems: TransactionDetailsDTO[];
-}
-
-// Define the data structure for creating a new order
-interface CreateOrderDTO {
-  orderReference: string;
-  orderDate: string;
-  clientId: number;
-  orderItems: {
-    productId: number;
-    unitId: number;
-    quantity: number;
-  }[];
-}
-
-// Define Client and Product interfaces
-interface ClientDTO {
-  id: number;
-  name: string;
-  email?: string;
-  phone?: string;
-}
-
-interface ProductDTO {
-  id: number;
-  name: string;
-  description?: string;
-}
-
-interface UnitDTO {
-  id: number;
-  name: string;
-  symbol: string;
 }
 
 // Define the paginated response structure
@@ -131,12 +78,10 @@ const OrderManagement = () => {
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { orderId } = useParams<{ orderId?: string }>();
   
   // Fetch order data with pagination
   const {
@@ -144,7 +89,7 @@ const OrderManagement = () => {
     isLoading,
     isError,
     error
-  } = useQuery<OrderDTO[]>({
+  } = useQuery<OrderContainer>({
     queryKey: ['orders', currentPage, pageSize],
     queryFn: async () => {
       const response = await orderApi.getAll(currentPage, pageSize);
@@ -153,41 +98,28 @@ const OrderManagement = () => {
     refetchOnWindowFocus: false
   });
   
-  // Get total count of orders for pagination
-  const { 
-    data: totalOrdersCount
-  } = useQuery<number>({
-    queryKey: ['ordersCount'],
-    queryFn: async () => {
-      const response = await orderApi.getTotalCount();
-      return response.data;
-    },
-    refetchOnWindowFocus: false
-  });
-  
-  // If we have a selected order ID, fetch the specific order details for the dialog
+  // If we have an orderId parameter, fetch the specific order details
   const {
-    data: selectedOrderDetails,
-    isLoading: isLoadingSelectedOrder,
-    isError: isErrorSelectedOrder,
-    refetch: refetchSelectedOrder
+    data: orderDetails,
+    isLoading: isLoadingDetails,
+    isError: isErrorDetails
   } = useQuery<OrderDTO>({
-    queryKey: ['order', selectedOrderId],
+    queryKey: ['order', orderId],
     queryFn: async () => {
-      const response = await orderApi.getById(Number(selectedOrderId));
+      const response = await orderApi.getById(Number(orderId));
       return response.data;
     },
-    enabled: !!selectedOrderId,
+    enabled: !!orderId,
     refetchOnWindowFocus: false
   });
 
   // Handle success and error states
   useEffect(() => {
-    if (totalOrdersCount !== undefined) {
-      setTotalElements(totalOrdersCount);
-      setTotalPages(Math.ceil(totalOrdersCount / pageSize));
+    if (orderData) {
+      setTotalElements(orderData.TotalNumberOfElements || 0);
+      setTotalPages(Math.ceil((orderData.TotalNumberOfElements || 0) / pageSize));
     }
-  }, [totalOrdersCount, pageSize]);
+  }, [orderData, pageSize]);
   
   useEffect(() => {
     if (isError && error) {
@@ -230,11 +162,11 @@ const OrderManagement = () => {
 
   // Filter orders based on search term
   const filteredOrders = useMemo(() => {
-    if (!orderData || !Array.isArray(orderData)) {
+    if (!orderData || !Array.isArray(orderData.pageElements)) {
       return [];
     }
     
-    return orderData.filter(order =>
+    return orderData.pageElements.filter(order =>
       order.orderReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.clientName.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -360,10 +292,7 @@ const OrderManagement = () => {
                 <TableRow 
                   key={order.id} 
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => {
-                    setSelectedOrderId(order.id);
-                    setIsDialogOpen(true);
-                  }}
+                  onClick={() => navigate(`/orders/${order.id}`)}
                 >
                   <TableCell className="font-medium">{order.id}</TableCell>
                   <TableCell>
@@ -392,11 +321,11 @@ const OrderManagement = () => {
                 </TableRow>
               ))
             ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No orders found.
-                  </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">
+                  No orders found.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -404,13 +333,143 @@ const OrderManagement = () => {
     );
   };
 
-  // Handle order creation success
-  const handleOrderCreationSuccess = () => {
-    // Invalidate queries to refetch the latest data
-    queryClient.invalidateQueries({ queryKey: ['orders'] });
-    queryClient.invalidateQueries({ queryKey: ['ordersCount'] });
-    toast.success('Order list has been refreshed with new data');
-  };
+  // If we have an orderId parameter, show the order details view
+  if (orderId) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <ShoppingCart className="h-8 w-8 text-primary" />
+            <div>
+              <div className="flex items-center space-x-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => navigate('/orders')}
+                >
+                  <span className="sr-only">Back to orders</span>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Order: {orderDetails?.orderReference || 'Loading...'}
+                </h1>
+              </div>
+              <p className="text-muted-foreground">
+                View order details and items
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/orders')}>
+            Back to Orders
+          </Button>
+        </div>
+
+        {isLoadingDetails ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                <span>Loading order details...</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : isErrorDetails ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex justify-center items-center h-40 text-red-500">
+                <AlertTriangle className="h-8 w-8 mr-2" />
+                <span>Error loading order details. Please try again.</span>
+              </div>
+            </CardContent>
+          </Card>
+        ) : orderDetails ? (
+          <>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Order Reference</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{orderDetails.orderReference}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Client</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{orderDetails.clientName}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Order Date</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatDate(orderDetails.orderDate)}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Items</CardTitle>
+                <CardDescription>
+                  Products included in this order
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[80px]">ID</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orderDetails.orderItems && orderDetails.orderItems.length > 0 ? (
+                        orderDetails.orderItems.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.id}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{item.productName}</div>
+                              <div className="text-xs text-muted-foreground">ID: {item.productId}</div>
+                            </TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>${item.price.toFixed(2)}</TableCell>
+                            <TableCell>${(item.quantity * item.price).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="h-24 text-center">
+                            No items found for this order.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+              <CardFooter className="border-t px-6 py-4">
+                <div className="flex justify-between w-full">
+                  <span className="font-semibold">Order Total:</span>
+                  <span className="font-bold">
+                    ${orderDetails.orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0).toFixed(2)}
+                  </span>
+                </div>
+              </CardFooter>
+            </Card>
+          </>
+        ) : null}
+      </div>
+    );
+  }
 
   // Main orders listing view
   return (
@@ -427,14 +486,6 @@ const OrderManagement = () => {
             </div>
           </div>
           <div className="flex space-x-2">
-            <Button 
-              variant="default" 
-              className="gap-2"
-              onClick={() => setIsCreateOrderDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Create Order
-            </Button>
             <Button variant="outline" onClick={() => {
               // Create CSV content from filteredOrders
               if (filteredOrders.length === 0) {
@@ -630,128 +681,6 @@ const OrderManagement = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Order Details Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <ShoppingCart className="h-5 w-5 mr-2 text-primary" />
-              Order Details
-            </DialogTitle>
-            <DialogDescription>
-              {selectedOrderDetails?.orderReference ? 
-                `Order Reference: ${selectedOrderDetails.orderReference}` : 
-                'Loading order details...'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {isLoadingSelectedOrder ? (
-            <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin mr-2" />
-              <span>Loading order details...</span>
-            </div>
-          ) : isErrorSelectedOrder ? (
-            <div className="flex flex-col items-center justify-center py-8 text-red-500">
-              <AlertTriangle className="h-12 w-12 mb-2" />
-              <h3 className="text-lg font-medium">Failed to load order details</h3>
-              <p>There was an error loading the order information.</p>
-            </div>
-          ) : selectedOrderDetails ? (
-            <>
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mb-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Client</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg font-bold">{selectedOrderDetails.clientName}</div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Order Date</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg font-bold">{formatDate(selectedOrderDetails.orderDate)}</div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg font-bold">
-                      {selectedOrderDetails.orderItems.reduce((sum, item) => sum + item.quantity, 0)}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[80px]">ID</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedOrderDetails.orderItems && selectedOrderDetails.orderItems.length > 0 ? (
-                      selectedOrderDetails.orderItems.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.id}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">{item.productName}</div>
-                          </TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{item.unit}</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
-                          No items found for this order.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          ) : null}
-          
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Order Dialog */}
-      <Dialog open={isCreateOrderDialogOpen} onOpenChange={setIsCreateOrderDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <ShoppingCart className="h-5 w-5 mr-2 text-primary" />
-              Create New Order
-            </DialogTitle>
-            <DialogDescription>
-              Add a new customer order to the system
-            </DialogDescription>
-          </DialogHeader>
-          
-          <CreateOrderForm 
-            onClose={() => setIsCreateOrderDialogOpen(false)} 
-            onSuccess={handleOrderCreationSuccess}
-          />
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

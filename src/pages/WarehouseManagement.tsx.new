@@ -192,7 +192,7 @@ const WarehouseManagement = () => {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search by name, address or code..."
+                  placeholder="Search warehouses..."
                   className="w-full pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}

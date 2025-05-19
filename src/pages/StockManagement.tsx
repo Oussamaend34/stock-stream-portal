@@ -1,0 +1,978 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from '@/components/ui/card';
+import { Search, Loader2, Filter, Boxes, BarChart3, Download, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import { stockApi, warehouseApi } from '@/lib/api';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+// Import our custom components
+import ImprovedFilter from '@/components/ImprovedFilter';
+
+// Define the stock data structure based on the DTO
+interface StockDTO {
+  id: number;
+  productId: number;
+  productName: string;
+  warehouseId: number;
+  WarehouseCode: string;
+  unit: string;
+  quantity: number;
+}
+
+// Define the paginated response structure
+interface StockContainer {
+  TotalNumberOfElements: number;
+  pageElements: StockDTO[];
+}
+
+// Define warehouse structure for dropdown
+interface Warehouse {
+  id: number;
+  code: string;
+  name: string;
+}
+
+// Define filter types
+type FilterType = 'all' | 'warehouse' | 'product' | 'low-stock' | 'advanced';
+
+const StockManagement = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1); // 1-based pagination
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
+  const [productId, setProductId] = useState<number | null>(null);
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
+  
+  // Advanced filter states
+  const [selectedProductNames, setSelectedProductNames] = useState<string[]>([]);
+  const [selectedWarehouseIds, setSelectedWarehouseIds] = useState<number[]>([]);
+  const [minQuantity, setMinQuantity] = useState<number | undefined>(undefined);
+  const [maxQuantity, setMaxQuantity] = useState<number | undefined>(undefined);
+
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = window.location;
+  const isLowStockRoute = location.pathname === '/stock/low-stock';
+  const { warehouseCode, productId: productIdParam } = useParams<{ warehouseCode?: string, productId?: string }>();
+
+  // Fetch warehouses for the filter dropdown
+  const { data: warehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const response = await warehouseApi.getAll();
+      return response.data;
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // Fetch low stock count
+  const { data: lowStockCount = 0 } = useQuery({
+    queryKey: ['lowStockCount', lowStockThreshold],
+    queryFn: async () => {
+      const response = await stockApi.getLowStockCount(lowStockThreshold);
+      return response.data;
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // Set filter based on URL parameters
+  // Reset to 'all' if no parameters are in the URL
+  useEffect(() => {
+    if (warehouseCode && warehouses) {
+      // Find the warehouse by code
+      const warehouse = warehouses.find((w: Warehouse) => w.code === warehouseCode);
+      if (warehouse) {
+        setWarehouseId(warehouse.id);
+        setFilterType('warehouse');
+      } else {
+        // If warehouse code is invalid, navigate back to main stock page
+        toast.error(`Warehouse with code ${warehouseCode} not found`);
+        navigate('/stock');
+      }
+    } else if (productIdParam) {
+      // Handle product ID parameter
+      const prodId = parseInt(productIdParam, 10);
+      if (!isNaN(prodId)) {
+        setProductId(prodId);
+        setFilterType('product');
+      } else {
+        // If product ID is invalid, navigate back to main stock page
+        toast.error(`Invalid product ID: ${productIdParam}`);
+        navigate('/stock');
+      }
+    } else if (isLowStockRoute) {
+      // Handle low stock route
+      setFilterType('low-stock');
+    } else if (!warehouseCode && !productIdParam && !isLowStockRoute) {
+      // If there are no parameters in the URL, reset to showing all stocks
+      setFilterType('all');
+      setWarehouseId(null);
+      setProductId(null);
+      // Reset to first page when switching to all
+      setCurrentPage(1);
+    }
+  }, [warehouseCode, productIdParam, isLowStockRoute, warehouses, navigate]);
+
+  // Effect to reset React Query cache when navigating back to all view
+  useEffect(() => {
+    if (!warehouseCode && !productIdParam && !isLowStockRoute) {
+      // Invalidate stocks query to force a refresh when navigating to all warehouses/products
+      queryClient.invalidateQueries({ queryKey: ['stocks'] });
+    }
+  }, [warehouseCode, productIdParam, isLowStockRoute, queryClient]);
+
+  // Fetch stock data based on the selected filter
+  const {
+    data: stockData,
+    isLoading,
+    isError,
+    refetch,
+    error
+  } = useQuery<StockContainer>({
+    // Add location.pathname to the query key to ensure it refetches when URL changes
+    queryKey: [
+      'stocks', 
+      filterType, 
+      warehouseId, 
+      productId, 
+      lowStockThreshold, 
+      selectedProductNames,
+      selectedWarehouseIds,
+      minQuantity,
+      maxQuantity,
+      currentPage, 
+      pageSize, 
+      window.location.pathname
+    ],
+    queryFn: async () => {
+      let response;
+      // No need to convert page number since API expects 1-based pagination
+      const apiPage = currentPage; // Keeping the 1-based pagination for API call
+      
+      switch (filterType) {
+        case 'warehouse':
+          if (!warehouseId) throw new Error('Warehouse ID is required for warehouse filter');
+          response = await stockApi.getByWarehouse(warehouseId, apiPage, pageSize);
+          break;
+        case 'product':
+          if (!productId) throw new Error('Product ID is required for product filter');
+          response = await stockApi.getByProduct(productId, apiPage, pageSize);
+          break;
+        case 'low-stock':
+          response = await stockApi.getLowStockItems(lowStockThreshold, apiPage, pageSize);
+          break;
+        case 'advanced': 
+          const filterOptions = {
+            productNames: selectedProductNames.length > 0 ? selectedProductNames : undefined,
+            warehouseIds: selectedWarehouseIds.length > 0 ? selectedWarehouseIds : undefined,
+            minQuantity: minQuantity !== undefined && minQuantity >= 0 ? minQuantity : undefined,
+            maxQuantity: maxQuantity !== undefined && maxQuantity >= 0 ? maxQuantity : undefined
+          };
+          
+          // Log filter options for debugging
+          console.log('Advanced filter options:', filterOptions);
+          
+          response = await stockApi.filter(filterOptions, apiPage, pageSize);
+          break;
+        default:
+          response = await stockApi.getAll(apiPage, pageSize);
+      }
+      
+      return response.data;
+    },
+    enabled: filterType === 'all' || 
+             (filterType === 'warehouse' && warehouseId !== null) || 
+             (filterType === 'product' && productId !== null) ||
+             filterType === 'low-stock' ||
+             filterType === 'advanced',
+    refetchOnWindowFocus: false
+  });
+  
+  // Handle success and error states
+  useEffect(() => {
+    if (stockData) {
+      setTotalElements(stockData.TotalNumberOfElements || 0);
+      setTotalPages(Math.ceil((stockData.TotalNumberOfElements || 0) / pageSize));
+    }
+  }, [stockData, pageSize]);
+  
+  useEffect(() => {
+    if (isError && error) {
+      toast.error(`Failed to fetch stock data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [isError, error]);
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    // Ensure we don't go beyond bounds (keeping as 1-based for consistency)
+    const boundedPage = Math.max(1, Math.min(newPage, totalPages));
+    
+    if (boundedPage !== currentPage) {
+      setCurrentPage(boundedPage);
+    }
+  };
+
+  // Handle page size change
+  const handlePageSizeChange = (newSize: number) => {
+    // Calculate which item should stay visible after page size change
+    // Adjust for 1-based pagination by using (currentPage - 1) for calculation
+    const firstItemIndex = (currentPage - 1) * pageSize;
+    
+    // Calculate new page number to keep the user viewing the same data
+    // Add 1 to maintain 1-based pagination
+    const newPage = Math.floor(firstItemIndex / newSize) + 1;
+    
+    // Ensure we never set page below 1 (since we use 1-based pagination)
+    const safeNewPage = Math.max(1, newPage);
+    
+    // Recalculate total pages with the new page size
+    const newTotalPages = Math.max(1, Math.ceil(totalElements / newSize));
+    
+    // Update state in the correct order
+    setPageSize(newSize);
+    setTotalPages(newTotalPages);
+    
+    // Make sure we don't go beyond the new total pages
+    const boundedPage = Math.min(safeNewPage, newTotalPages);
+    setCurrentPage(boundedPage);
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (type: FilterType) => {
+    setFilterType(type);
+    setCurrentPage(1); // Reset to first page when changing filters (1-based)
+  };
+
+  const handleWarehouseFilterChange = (id: string) => {
+    setWarehouseId(parseInt(id));
+    setFilterType('warehouse');
+    setCurrentPage(1); // Reset to first page (1-based)
+  };
+
+  const handleProductFilterChange = (id: string) => {
+    setProductId(parseInt(id));
+    setFilterType('product');
+    setCurrentPage(1); // Reset to first page (1-based)
+  };
+
+  const handleClearFilters = () => {
+    setFilterType('all');
+    setWarehouseId(null);
+    setProductId(null);
+    setCurrentPage(1); // Reset to first page (1-based)
+    
+    // Reset advanced filter states
+    setSelectedProductNames([]);
+    setSelectedWarehouseIds([]);
+    setMinQuantity(undefined);
+    setMaxQuantity(undefined);
+    
+    // Navigate to the main stock page if we're on a filtered URL
+    if (warehouseCode || productIdParam || isLowStockRoute || location.pathname === '/stock/advanced-filter') {
+      navigate('/stock');
+    }
+  };
+
+  /* Add loading indicator for when advanced filter is being applied */
+  const [isApplyingAdvancedFilter, setIsApplyingAdvancedFilter] = useState(false);
+  
+  // Modified handleAdvancedFilter to show loading state
+  const handleAdvancedFilter = () => {
+    setIsApplyingAdvancedFilter(true);
+    setFilterType('advanced');
+    setCurrentPage(1);
+    
+    // Build URL search params for the advanced filter
+    const searchParams = new URLSearchParams();
+    
+    // Add product names to URL if available - use pipe separator instead of comma
+    // Encode each product name individually to properly handle special characters
+    if (selectedProductNames.length > 0) {
+      const encodedNames = selectedProductNames.map(name => encodeURIComponent(name));
+      searchParams.set('products', encodedNames.join('|'));
+    }
+    
+    // Add warehouse IDs to URL if available - use pipe separator instead of comma
+    if (selectedWarehouseIds.length > 0) {
+      searchParams.set('warehouses', selectedWarehouseIds.join('|'));
+    }
+    
+    // Add min quantity to URL if available
+    if (minQuantity !== undefined) {
+      searchParams.set('minQty', minQuantity.toString());
+    }
+    
+    // Add max quantity to URL if available
+    if (maxQuantity !== undefined) {
+      searchParams.set('maxQty', maxQuantity.toString());
+    }
+    
+    // Navigate to the advanced filter route with search params
+    // This makes the filtered view shareable via URL
+    navigate({
+      pathname: '/stock/advanced-filter',
+      search: searchParams.toString()
+    });
+    
+    // Turn off loading state after navigation
+    setTimeout(() => setIsApplyingAdvancedFilter(false), 500);
+  };
+
+  // Filter stock data based on search term
+  const filteredStocks = useMemo(() => {
+    // Make sure stockData and pageElements exist before filtering
+    if (!stockData || !Array.isArray(stockData.pageElements)) {
+      return [];
+    }
+    
+    return stockData.pageElements.filter(stock =>
+      stock.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      stock.WarehouseCode.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [stockData, searchTerm]);
+
+  // Generate pagination items
+  const generatePaginationItems = () => {
+    const items = [];
+    const maxPagesToShow = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    
+    // Adjust if we're near the end
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+    
+    // First page
+    if (startPage > 1) {
+      items.push(
+        <PaginationItem key="first">
+          <PaginationLink onClick={() => handlePageChange(1)} isActive={currentPage === 1}>
+            1
+          </PaginationLink>
+        </PaginationItem>
+      );
+      
+      // Add ellipsis if needed
+      if (startPage > 2) {
+        items.push(
+          <PaginationItem key="ellipsis-start">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+    }
+    
+    // Page numbers
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => handlePageChange(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    
+    // Last page
+    if (endPage < totalPages) {
+      // Add ellipsis if needed
+      if (endPage < totalPages - 1) {
+        items.push(
+          <PaginationItem key="ellipsis-end">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+      
+      items.push(
+        <PaginationItem key="last">
+          <PaginationLink onClick={() => handlePageChange(totalPages)} isActive={currentPage === totalPages}>
+            {totalPages}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    
+    return items;
+  };
+
+  // Check if next/previous buttons should be disabled
+  const canGoToPrevious = currentPage > 1;
+  const canGoToNext = currentPage < totalPages;
+
+  // Effect to detect advanced filter route and set state accordingly
+  useEffect(() => {
+    const isAdvancedFilterRoute = location.pathname === '/stock/advanced-filter';
+    
+    if (isAdvancedFilterRoute) {
+      // Parse URL search params for filter values
+      const searchParams = new URLSearchParams(location.search);
+      
+      // Get product names from URL (pipe-separated)
+      const productNamesParam = searchParams.get('products');
+      if (productNamesParam) {
+        try {
+          // Split by pipe first, then decode each name individually
+          const productNames = productNamesParam
+            .split('|')
+            .map(name => decodeURIComponent(name))
+            .filter(name => name.trim().length > 0);
+          
+          setSelectedProductNames(productNames);
+        } catch (error) {
+          console.error("Error decoding product names from URL:", error);
+          // Fallback in case of decoding errors
+          setSelectedProductNames([]);
+        }
+      }
+      
+      // Get warehouse IDs from URL (pipe-separated)
+      const warehouseIdsParam = searchParams.get('warehouses');
+      if (warehouseIdsParam) {
+        const warehouseIds = warehouseIdsParam.split('|')
+          .map(id => parseInt(id.trim(), 10))
+          .filter(id => !isNaN(id));
+        setSelectedWarehouseIds(warehouseIds);
+      }
+      
+      // Get min and max quantity from URL
+      const minQtyParam = searchParams.get('minQty');
+      if (minQtyParam) {
+        const minQty = parseInt(minQtyParam, 10);
+        if (!isNaN(minQty)) {
+          setMinQuantity(minQty);
+        }
+      }
+      
+      const maxQtyParam = searchParams.get('maxQty');
+      if (maxQtyParam) {
+        const maxQty = parseInt(maxQtyParam, 10);
+        if (!isNaN(maxQty)) {
+          setMaxQuantity(maxQty);
+        }
+      }
+      
+      // Set filter type to advanced
+      setFilterType('advanced');
+    }
+  }, [location.pathname, location.search]);
+
+  // Define the base URL for API calls
+  const API_BASE_URL = 'http://localhost:8080/api/v1';
+
+  return (
+    <>
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Boxes className="h-8 w-8 text-warehouse-600" />
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {warehouseCode 
+                  ? `Stock: Warehouse ${warehouseCode}` 
+                  : productIdParam
+                    ? `Stock: Product #${productIdParam}`
+                    : isLowStockRoute
+                      ? 'Low Stock Items'
+                      : filterType === 'advanced'
+                        ? 'Filtered Stock'
+                        : 'Stock Management'}
+              </h1>
+              <p className="text-muted-foreground">
+                {warehouseCode 
+                  ? `View inventory for warehouse ${warehouseCode}` 
+                  : productIdParam
+                    ? `View inventory for product #${productIdParam} across all warehouses`
+                    : isLowStockRoute
+                      ? `Items that need restocking`
+                      : filterType === 'advanced'
+                        ? `Custom filtered view of your inventory`
+                        : 'View and manage your inventory across warehouses'}
+                {(warehouseCode || productIdParam || isLowStockRoute) && (
+                  <span className="ml-2">
+                    <Button 
+                      variant="link" 
+                      onClick={() => {
+                        // Reset state before navigation
+                        setFilterType('all');
+                        setWarehouseId(null);
+                        setProductId(null);
+                        setCurrentPage(1);
+                        navigate('/stock');
+                      }}
+                      className="text-blue-600 hover:text-blue-800 hover:underline p-0 h-auto"
+                    >
+                      (View all inventory)
+                    </Button>
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => {
+              // Create CSV content from filteredStocks
+              if (filteredStocks.length === 0) {
+                toast.error("No data to export");
+                return;
+              }
+              
+              // Create headers
+              const headers = ['ID', 'Product ID', 'Product Name', 'Warehouse ID', 'Warehouse Code', 'Unit', 'Quantity'];
+              const csvRows = [headers.join(',')];
+              
+              // Create rows
+              filteredStocks.forEach(stock => {
+                const row = [
+                  stock.id,
+                  stock.productId,
+                  `"${stock.productName.replace(/"/g, '""')}"`, // Escape quotes
+                  stock.warehouseId,
+                  stock.WarehouseCode,
+                  stock.unit,
+                  stock.quantity
+                ];
+                csvRows.push(row.join(','));
+              });
+              
+              // Generate CSV
+              const csvContent = csvRows.join('\n');
+              
+              // Create download
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.setAttribute('href', url);
+              link.setAttribute('download', `stock-data-${new Date().toISOString().slice(0,10)}.csv`);
+              link.style.visibility = 'hidden';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              toast.success("Stock data exported to CSV");
+            }}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+            
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filter
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Filter Stock</DialogTitle>
+                  <DialogDescription>
+                    Apply filters to your inventory data
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-4">
+                  {/* Advanced filter component */}
+                  <ImprovedFilter
+                    warehouses={warehouses || []}
+                    selectedProductNames={selectedProductNames}
+                    selectedWarehouseIds={selectedWarehouseIds}
+                    minQuantity={minQuantity}
+                    maxQuantity={maxQuantity}
+                    onProductNamesChange={setSelectedProductNames}
+                    onWarehouseIdsChange={setSelectedWarehouseIds}
+                    onMinQuantityChange={setMinQuantity}
+                    onMaxQuantityChange={setMaxQuantity}
+                    onApplyFilters={handleAdvancedFilter}
+                    isLoading={isApplyingAdvancedFilter}
+                    onClearFilters={handleClearFilters}
+                  />
+                  
+                  {/* Low stock threshold functionality */}
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <h4 className="text-sm font-medium mb-2">Low Stock Threshold</h4>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Threshold"
+                        value={lowStockThreshold}
+                        className="w-32"
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          if (!isNaN(value) && value > 0) {
+                            setLowStockThreshold(value);
+                            if (filterType === 'low-stock') {
+                              queryClient.invalidateQueries({ queryKey: ['stocks'] });
+                              queryClient.invalidateQueries({ queryKey: ['lowStockCount'] });
+                            }
+                          }
+                        }}
+                      />
+                      <Button 
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setFilterType('low-stock');
+                          navigate('/stock/low-stock');
+                        }}
+                      >
+                        Show Low Stock
+                        {lowStockCount > 0 && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            {lowStockCount}
+                          </span>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t">
+                    <Button 
+                      variant="default" 
+                      className="w-full"
+                      onClick={handleClearFilters}
+                    >
+                      Reset All Filters
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalElements.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">
+                {warehouseCode 
+                  ? `In warehouse ${warehouseCode}` 
+                  : productIdParam
+                    ? `For product #${productIdParam}`
+                    : isLowStockRoute
+                      ? `With quantity ≤ ${lowStockThreshold}`
+                      : filterType === 'advanced'
+                        ? `Filtered by ${[
+                            selectedProductNames.length > 0 ? `${selectedProductNames.length} product${selectedProductNames.length !== 1 ? 's' : ''}` : '',
+                            selectedWarehouseIds.length > 0 ? `${selectedWarehouseIds.length} warehouse${selectedWarehouseIds.length !== 1 ? 's' : ''}` : '',
+                            minQuantity !== undefined ? `min qty: ${minQuantity}` : '',
+                            maxQuantity !== undefined ? `max qty: ${maxQuantity}` : ''
+                          ].filter(Boolean).join(', ') || 'custom criteria'}`
+                        : 'Across all warehouses'}
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate('/stock/low-stock')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center space-x-2">
+                <span>Low Stock Items</span>
+                {(isLowStockRoute ? filteredStocks.length : lowStockCount) > 0 && (
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col">
+                <div className="text-3xl font-bold text-amber-600">
+                  {isLowStockRoute ? filteredStocks.length : lowStockCount}
+                </div>
+                {!isLowStockRoute && lowStockCount > 0 && (
+                  <div className="mt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-xs text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100"
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {filteredStocks.reduce((sum, stock) => sum + stock.quantity, 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Units across all products
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Average Quantity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {filteredStocks.length > 0 
+                  ? Math.round(filteredStocks.reduce((sum, stock) => sum + stock.quantity, 0) / filteredStocks.length).toLocaleString() 
+                  : 0}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Units per product
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex justify-between items-center">
+              <CardTitle>Inventory</CardTitle>
+              {filterType === 'advanced' && (
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <span className="mr-2">Active filters:</span>
+                  <div className="flex flex-wrap gap-1 max-w-[500px]">
+                    {selectedProductNames.length > 0 && (
+                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                        {selectedProductNames.length} product{selectedProductNames.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {selectedWarehouseIds.length > 0 && (
+                      <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs">
+                        {selectedWarehouseIds.length} warehouse{selectedWarehouseIds.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {minQuantity !== undefined && (
+                      <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs">
+                        Min qty: {minQuantity}
+                      </span>
+                    )}
+                    {maxQuantity !== undefined && (
+                      <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs">
+                        Max qty: {maxQuantity}
+                      </span>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-5 px-2 text-xs text-gray-500"
+                      onClick={handleClearFilters}
+                    >
+                      Clear all
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
+              <div className="relative w-full">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search by product or warehouse..."
+                  className="w-full pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">ID</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Quantity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        <div className="flex justify-center items-center">
+                          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                          Loading stock data...
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : isError ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center text-red-500">
+                        Error loading stock data. Please try again.
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredStocks.length > 0 ? (
+                    filteredStocks.map((stock) => (
+                      <TableRow key={stock.id}>
+                        <TableCell className="font-medium">{stock.id}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            <Link 
+                              to={`/stock/products/${stock.productId}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                            >
+                              {stock.productName}
+                            </Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground">ID: {stock.productId}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <Link 
+                              to={`/stock/warehouses/${stock.WarehouseCode}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                            >
+                              {stock.WarehouseCode}
+                            </Link>
+                          </div> 
+                          <div className="text-xs text-muted-foreground">ID: {stock.warehouseId}</div>
+                        </TableCell>
+                        <TableCell>{stock.unit}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            stock.quantity <= 10 ? 'bg-red-100 text-red-800' : 
+                            stock.quantity <= 30 ? 'bg-amber-100 text-amber-800' : 
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {stock.quantity}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        No stock data found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center space-x-2">
+                <p className="text-sm text-muted-foreground">
+                  Showing {filteredStocks.length} of {totalElements} items
+                </p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-muted-foreground">Items per page</p>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue placeholder={pageSize.toString()} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <p className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </p>
+                
+                <div className="flex items-center space-x-1">
+                  {/* Previous page button */}
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => canGoToPrevious ? handlePageChange(currentPage - 1) : null}
+                    disabled={!canGoToPrevious}
+                    className="h-8 w-8 p-0"
+                  >
+                    <span className="sr-only">Previous page</span>
+                    <span>‹</span>
+                  </Button>
+                  
+                  {/* Page number buttons */}
+                  {generatePaginationItems()}
+                  
+                  {/* Next page button */}
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => canGoToNext ? handlePageChange(currentPage + 1) : null}
+                    disabled={!canGoToNext}
+                    className="h-8 w-8 p-0"
+                  >
+                    <span className="sr-only">Next page</span>
+                    <span>›</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+};
+
+export default StockManagement;

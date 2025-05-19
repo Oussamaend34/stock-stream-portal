@@ -1,15 +1,15 @@
-
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import UserManagement from "./pages/UserManagement";
 import WarehouseManagement from "./pages/WarehouseManagement";
 import OrderManagement from "./pages/OrderManagement";
 import ShipmentManagement from "./pages/ShipmentManagement";
+import ClientManagement from "./pages/ClientManagement";
+import StockManagement from "./pages/StockManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -17,18 +17,24 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/users" element={<UserManagement />} />
-          <Route path="/warehouses" element={<WarehouseManagement />} />
-          <Route path="/orders" element={<OrderManagement />} />
-          <Route path="/shipments" element={<ShipmentManagement />} />
-          <Route path="*" element={<NotFound />} />
+
+          {/* Authenticated routes with Layout (sidebar) */}
+          <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+          <Route path="/users" element={<Layout><UserManagement /></Layout>} />
+          <Route path="/warehouses" element={<Layout><WarehouseManagement /></Layout>} />
+          <Route path="/stock" element={<Layout><StockManagement /></Layout>} />
+          <Route path="/stock/warehouses/:warehouseCode" element={<Layout><StockManagement /></Layout>} />
+          <Route path="/stock/products/:productId" element={<Layout><StockManagement /></Layout>} />
+          <Route path="/stock/low-stock" element={<Layout><StockManagement /></Layout>} />
+          <Route path="/stock/advanced-filter" element={<Layout><StockManagement /></Layout>} />
+          <Route path="/orders" element={<Layout><OrderManagement /></Layout>} />
+          <Route path="/shipments" element={<Layout><ShipmentManagement /></Layout>} />
+          <Route path="/clients" element={<Layout><ClientManagement /></Layout>} />
+          <Route path="*" element={<Layout><NotFound /></Layout>} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

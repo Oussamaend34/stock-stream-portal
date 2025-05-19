@@ -1,6 +1,4 @@
-
 import React, { useState } from 'react';
-import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -24,7 +22,7 @@ import {
   CardHeader, 
   CardTitle,
 } from '@/components/ui/card';
-import { Truck, Edit, Trash2, MoreHorizontal, Search, Plus } from 'lucide-react';
+import { Truck, Edit, Trash2, MoreHorizontal, Search, Plus, Loader2 } from 'lucide-react';
 import ShipmentForm, { Shipment } from '@/components/ShipmentForm';
 import { toast } from 'sonner';
 import { 
@@ -46,83 +44,92 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
-// Mock data
-const initialShipments: Shipment[] = [
-  { 
-    id: 1, 
-    shipmentNumber: 'SHP-2001', 
-    orderNumber: 'ORD-1001', 
-    product: 'Laptop', 
-    quantity: 5, 
-    fromWarehouse: 'Central Warehouse', 
-    destination: 'Acme Corp HQ, New York', 
-    status: 'DELIVERED', 
-    date: '2023-05-03' 
-  },
-  { 
-    id: 2, 
-    shipmentNumber: 'SHP-2002', 
-    orderNumber: 'ORD-1002', 
-    product: 'Monitor', 
-    quantity: 10, 
-    fromWarehouse: 'West Depot', 
-    destination: 'TechStart Office, San Francisco', 
-    status: 'IN_TRANSIT', 
-    date: '2023-05-04' 
-  },
-  { 
-    id: 3, 
-    shipmentNumber: 'SHP-2003', 
-    orderNumber: 'ORD-1003', 
-    product: 'Keyboard', 
-    quantity: 20, 
-    fromWarehouse: 'East Storage', 
-    destination: 'Global Shipping Center, Miami', 
-    status: 'PREPARING', 
-    date: '2023-05-05' 
-  },
-  { 
-    id: 4, 
-    shipmentNumber: 'SHP-2004', 
-    orderNumber: 'ORD-1004', 
-    product: 'Mouse', 
-    quantity: 30, 
-    fromWarehouse: 'North Storage', 
-    destination: 'Quick Electronics Store, Chicago', 
-    status: 'FAILED', 
-    date: '2023-05-06' 
-  },
-  { 
-    id: 5, 
-    shipmentNumber: 'SHP-2005', 
-    orderNumber: 'ORD-1005', 
-    product: 'Printer', 
-    quantity: 2, 
-    fromWarehouse: 'South Facility', 
-    destination: 'Office Supplies Inc, Houston', 
-    status: 'DELIVERED', 
-    date: '2023-05-07' 
-  },
-];
-
-// Mock warehouse data
-const warehouseList = ['Central Warehouse', 'West Depot', 'North Storage', 'East Storage', 'South Facility'];
-
-// Mock order numbers
-const orderNumbers = ['ORD-1001', 'ORD-1002', 'ORD-1003', 'ORD-1004', 'ORD-1005', 'ORD-1006', 'ORD-1007'];
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { shipmentApi, warehouseApi, orderApi } from '@/lib/api';
 
 const ShipmentManagement = () => {
-  const [shipments, setShipments] = useState<Shipment[]>(initialShipments);
   const [searchTerm, setSearchTerm] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [currentShipment, setCurrentShipment] = useState<Shipment | undefined>(undefined);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [currentPage, setCurrentPage] = useState(1);
-  
+  const [warehouseList, setWarehouseList] = useState<string[]>([]);
+  const [orderNumbers, setOrderNumbers] = useState<string[]>([]);
+
+  const queryClient = useQueryClient();
   const itemsPerPage = 5;
-  
+
+  // Fetch shipments
+  const { 
+    data: shipments = [], 
+    isLoading: isLoadingShipments, 
+    isError: isErrorShipments 
+  } = useQuery({
+    queryKey: ['shipments'],
+    queryFn: async () => {
+      const response = await shipmentApi.getAll();
+      return response.data;
+    }
+  });
+
+  // Fetch warehouses for the dropdown
+  const { 
+    data: warehouses = [], 
+    isLoading: isLoadingWarehouses 
+  } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const response = await warehouseApi.getAll();
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Extract warehouse names for the dropdown
+      setWarehouseList(data.map((warehouse: any) => warehouse.name));
+    }
+  });
+
+  // Fetch orders for the dropdown
+  const { 
+    data: orders = [], 
+    isLoading: isLoadingOrders 
+  } = useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const response = await orderApi.getAll();
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Extract order numbers for the dropdown
+      setOrderNumbers(data.map((order: any) => order.orderNumber));
+    }
+  });
+
+  // Create shipment mutation
+  const createShipmentMutation = useMutation({
+    mutationFn: (shipmentData: Shipment) => shipmentApi.create(shipmentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+    }
+  });
+
+  // Update shipment mutation
+  const updateShipmentMutation = useMutation({
+    mutationFn: ({ id, shipmentData }: { id: number, shipmentData: Shipment }) => 
+      shipmentApi.update(id, shipmentData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+    }
+  });
+
+  // Delete shipment mutation
+  const deleteShipmentMutation = useMutation({
+    mutationFn: (id: number) => shipmentApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+    }
+  });
+
   // Filter shipments based on search term
   const filteredShipments = shipments.filter(shipment => 
     shipment.shipmentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -132,7 +139,7 @@ const ShipmentManagement = () => {
     shipment.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
     shipment.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
+
   // Paginate shipments
   const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
   const paginatedShipments = filteredShipments.slice(
@@ -158,25 +165,41 @@ const ShipmentManagement = () => {
   };
 
   const handleDelete = () => {
-    if (currentShipment) {
-      setShipments(shipments.filter(s => s.id !== currentShipment.id));
-      toast.success(`Shipment ${currentShipment.shipmentNumber} has been deleted`);
-      setDeleteDialogOpen(false);
+    if (currentShipment && currentShipment.id) {
+      deleteShipmentMutation.mutate(currentShipment.id, {
+        onSuccess: () => {
+          toast.success(`Shipment ${currentShipment.shipmentNumber} has been deleted`);
+          setDeleteDialogOpen(false);
+        },
+        onError: (error) => {
+          toast.error(`Failed to delete shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      });
     }
   };
 
   const handleFormSubmit = (shipment: Shipment) => {
     if (formMode === 'create') {
-      // Simulate backend assigning an ID
-      const newShipment = { ...shipment, id: Math.max(...shipments.map(s => s.id || 0)) + 1 };
-      setShipments([...shipments, newShipment]);
-      toast.success(`Shipment ${shipment.shipmentNumber} has been created`);
-    } else {
-      // Update existing shipment
-      setShipments(shipments.map(s => s.id === shipment.id ? shipment : s));
-      toast.success(`Shipment ${shipment.shipmentNumber} has been updated`);
+      createShipmentMutation.mutate(shipment, {
+        onSuccess: () => {
+          toast.success(`Shipment ${shipment.shipmentNumber} has been created`);
+          setFormOpen(false);
+        },
+        onError: (error) => {
+          toast.error(`Failed to create shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      });
+    } else if (shipment.id) {
+      updateShipmentMutation.mutate({ id: shipment.id, shipmentData: shipment }, {
+        onSuccess: () => {
+          toast.success(`Shipment ${shipment.shipmentNumber} has been updated`);
+          setFormOpen(false);
+        },
+        onError: (error) => {
+          toast.error(`Failed to update shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      });
     }
-    setFormOpen(false);
   };
 
   const getStatusBadgeClass = (status: Shipment['status']) => {
@@ -195,7 +218,7 @@ const ShipmentManagement = () => {
   };
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
@@ -246,7 +269,22 @@ const ShipmentManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedShipments.length > 0 ? (
+                  {isLoadingShipments ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center">
+                        <div className="flex justify-center items-center">
+                          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                          Loading shipments...
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : isErrorShipments ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center text-red-500">
+                        Error loading shipments. Please try again.
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedShipments.length > 0 ? (
                     paginatedShipments.map((shipment) => (
                       <TableRow key={shipment.id}>
                         <TableCell className="font-medium">{shipment.shipmentNumber}</TableCell>
@@ -298,7 +336,7 @@ const ShipmentManagement = () => {
                 </TableBody>
               </Table>
             </div>
-            
+
             {totalPages > 1 && (
               <Pagination className="mt-4">
                 <PaginationContent>
@@ -308,7 +346,7 @@ const ShipmentManagement = () => {
                       className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
                     />
                   </PaginationItem>
-                  
+
                   {[...Array(totalPages)].map((_, i) => (
                     <PaginationItem key={i + 1}>
                       <PaginationLink
@@ -319,7 +357,7 @@ const ShipmentManagement = () => {
                       </PaginationLink>
                     </PaginationItem>
                   ))}
-                  
+
                   <PaginationItem>
                     <PaginationNext 
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
@@ -341,6 +379,7 @@ const ShipmentManagement = () => {
         mode={formMode}
         warehouses={warehouseList}
         orderNumbers={orderNumbers}
+        isLoading={isLoadingWarehouses || isLoadingOrders}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -360,7 +399,7 @@ const ShipmentManagement = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Layout>
+    </>
   );
 };
 
