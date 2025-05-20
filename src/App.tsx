@@ -9,6 +9,7 @@ import WarehouseManagement from "./pages/WarehouseManagement";
 import OrderManagement from "./pages/OrderManagement";
 import PurchaseManagement from "./pages/PurchaseManagement";
 import ShipmentManagement from "./pages/ShipmentManagement";
+import ReceptionManagement from "./pages/ReceptionManagement";
 import ClientManagement from "./pages/ClientManagement";
 import SupplierManagement from "./pages/SupplierManagement";
 import StockManagement from "./pages/StockManagement";
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/orders" element={<Layout><OrderManagement /></Layout>} />
           <Route path="/purchases" element={<Layout><PurchaseManagement /></Layout>} />
           <Route path="/shipments" element={<Layout><ShipmentManagement /></Layout>} />
+          <Route path="/receptions" element={<Layout><ReceptionManagement /></Layout>} />
           <Route path="/products" element={<Layout><ProductManagement /></Layout>} />
           <Route path="/clients" element={<Layout><ClientManagement /></Layout>} />
           <Route path="/suppliers" element={<Layout><SupplierManagement /></Layout>} />

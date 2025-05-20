@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Package,
+  PackageOpen,
   Truck,
   Warehouse,
   User,
@@ -37,6 +38,7 @@ const NavBar = () => {
     { name: 'Orders', path: '/orders', icon: <ShoppingCart size={20} /> },
     { name: 'Purchases', path: '/purchases', icon: <ShoppingBag size={20} /> },
     { name: 'Shipments', path: '/shipments', icon: <Truck size={20} /> },
+    { name: 'Receptions', path: '/receptions', icon: <PackageOpen size={20} /> },
   ];
 
   const toggleMenu = () => {

@@ -179,6 +179,47 @@ export const shipmentApi = {
   delete: (id: number) => api.delete(`/shipments/${id}`),
 };
 
+// Reception API types
+export interface ReceptionDTO {
+  id: number;
+  receptionDate: string; // ISO date string format
+  quantity: number;
+  product: string;
+  unit: string;
+  warehouse: string;
+  remarks: string;
+  purchaseReference: string;
+  supplierName: string;
+}
+
+// Reception Creation Request type
+export interface ReceptionCreationRequest {
+  receptionDate: string; // ISO date string format
+  productId: number;
+  unitId: number;
+  warehouseId: number;
+  purchaseId?: number | null; // Optional as per requirements
+  remarks: string;
+  quantity: number;
+}
+
+// For type safety
+export type ReceptionsContainer = Container<ReceptionDTO>;
+
+// Reception API endpoints
+export const receptionApi = {
+  getAll: (page = 1, size = 10) => {
+    return api.get('/receptions', {
+      params: { page, size },
+      timeout: 10000
+    });
+  },
+  getById: (id: number) => api.get(`/receptions/${id}`),
+  create: (receptionData: ReceptionCreationRequest) => api.post('/receptions', receptionData),
+  update: (id: number, receptionData: any) => api.put(`/receptions/${id}`, receptionData),
+  delete: (id: number) => api.delete(`/receptions/${id}`),
+};
+
 // Client API types
 import { Client } from '@/components/ClientForm';
 
