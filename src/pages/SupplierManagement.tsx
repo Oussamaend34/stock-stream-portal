@@ -30,7 +30,7 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { UserCircle, Edit, Trash2, MoreHorizontal, Search, Plus, Loader2, Mail, Phone, MapPin } from 'lucide-react';
-import ClientForm, { Client } from '@/components/ClientForm';
+import SupplierForm, { Supplier } from '@/components/SupplierForm';
 import { toast } from 'sonner';
 import { 
   AlertDialog,
@@ -43,13 +43,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { clientApi, ClientsContainer } from '@/lib/api';
+import { supplierApi, SuppliersContainer } from '@/lib/api';
 
-const ClientManagement = () => {
+const SupplierManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [currentClient, setCurrentClient] = useState<Client | undefined>(undefined);
+  const [currentSupplier, setCurrentSupplier] = useState<Supplier | undefined>(undefined);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -57,90 +57,90 @@ const ClientManagement = () => {
 
   const queryClient = useQueryClient();
 
-  // Fetch clients
-  const { data: clientsData, isLoading, isError } = useQuery({
-    queryKey: ['clients', page, size],
+  // Fetch suppliers
+  const { data: suppliersData, isLoading, isError } = useQuery({
+    queryKey: ['suppliers', page, size],
     queryFn: async () => {
-      const response = await clientApi.getAll(page, size);
-      return response.data as ClientsContainer;
+      const response = await supplierApi.getAll(page, size);
+      return response.data as SuppliersContainer;
     }
   });
 
-  // Extract clients from the container
-  const clients = clientsData?.items || [];
+  // Extract suppliers from the container
+  const suppliers = suppliersData?.items || [];
 
-  // Update totalCount when clientsData changes
+  // Update totalCount when suppliersData changes
   useEffect(() => {
-    if (clientsData) {
-      setTotalCount(clientsData.count);
+    if (suppliersData) {
+      setTotalCount(suppliersData.count);
     }
-  }, [clientsData]);
+  }, [suppliersData]);
 
-  // Create client mutation - without global success handlers to avoid duplicate notifications
-  const createClientMutation = useMutation({
-    mutationFn: (clientData: Client) => clientApi.create(clientData),
+  // Create supplier mutation - without global success handlers to avoid duplicate notifications
+  const createSupplierMutation = useMutation({
+    mutationFn: (supplierData: Supplier) => supplierApi.create(supplierData),
     meta: {
       // Add a meta tag to indicate this mutation should only show notifications in its specific handler
       notificationsHandledInCallback: true
     }
   });
 
-  // Update client mutation - without global success handlers to avoid duplicate notifications
-  const updateClientMutation = useMutation({
-    mutationFn: ({ id, clientData }: { id: number, clientData: Client }) => 
-      clientApi.update(id, clientData),
+  // Update supplier mutation - without global success handlers to avoid duplicate notifications
+  const updateSupplierMutation = useMutation({
+    mutationFn: ({ id, supplierData }: { id: number, supplierData: Supplier }) => 
+      supplierApi.update(id, supplierData),
     meta: {
       // Add a meta tag to indicate this mutation should only show notifications in its specific handler
       notificationsHandledInCallback: true
     }
   });
 
-  // Delete client mutation - without global success handlers to avoid duplicate notifications
-  const deleteClientMutation = useMutation({
-    mutationFn: (id: number) => clientApi.delete(id),
+  // Delete supplier mutation - without global success handlers to avoid duplicate notifications
+  const deleteSupplierMutation = useMutation({
+    mutationFn: (id: number) => supplierApi.delete(id),
     meta: {
       // Add a meta tag to indicate this mutation should only show notifications in its specific handler
       notificationsHandledInCallback: true
     }
   });
 
-  const filteredClients = clients.filter(client => 
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.address.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSuppliers = suppliers.filter(supplier => 
+    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    supplier.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    supplier.address.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleCreate = () => {
     setFormMode('create');
-    setCurrentClient(undefined);
+    setCurrentSupplier(undefined);
     setFormOpen(true);
   };
 
-  const handleEdit = (client: Client) => {
+  const handleEdit = (supplier: Supplier) => {
     setFormMode('edit');
-    setCurrentClient(client);
+    setCurrentSupplier(supplier);
     setFormOpen(true);
   };
 
-  const handleDeleteIntent = (client: Client) => {
-    setCurrentClient(client);
+  const handleDeleteIntent = (supplier: Supplier) => {
+    setCurrentSupplier(supplier);
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = () => {
-    if (currentClient && currentClient.id) {
-      deleteClientMutation.mutate(currentClient.id, {
+    if (currentSupplier && currentSupplier.id) {
+      deleteSupplierMutation.mutate(currentSupplier.id, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for client deletion should be triggered
-          toast.success(`Client ${currentClient.name} has been deleted`);
+          // IMPORTANT: This is the ONLY place where toast notifications for supplier deletion should be triggered
+          toast.success(`Supplier ${currentSupplier.name} has been deleted`);
           setDeleteDialogOpen(false);
 
           // Invalidate queries to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['clients', page, size] });
+          queryClient.invalidateQueries({ queryKey: ['suppliers', page, size] });
         },
         onError: (error) => {
-          toast.error(`Failed to delete client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(`Failed to delete supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
         },
         // This is crucial - it ensures no other handlers will run
         onSettled: () => {
@@ -150,37 +150,37 @@ const ClientManagement = () => {
     }
   };
 
-  const handleFormSubmit = (client: Client) => {
+  const handleFormSubmit = (supplier: Supplier) => {
     if (formMode === 'create') {
-      createClientMutation.mutate(client, {
+      createSupplierMutation.mutate(supplier, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for client creation should be triggered
-          toast.success(`Client ${client.name} has been created`);
+          // IMPORTANT: This is the ONLY place where toast notifications for supplier creation should be triggered
+          toast.success(`Supplier ${supplier.name} has been created`);
           setFormOpen(false);
 
           // Invalidate queries to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['clients', page, size] });
+          queryClient.invalidateQueries({ queryKey: ['suppliers', page, size] });
         },
         onError: (error) => {
-          toast.error(`Failed to create client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(`Failed to create supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
         },
         // This is crucial - it ensures no other handlers will run
         onSettled: () => {
           // Any cleanup after creation
         }
       });
-    } else if (client.id) {
-      updateClientMutation.mutate({ id: client.id, clientData: client }, {
+    } else if (supplier.id) {
+      updateSupplierMutation.mutate({ id: supplier.id, supplierData: supplier }, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for client updates should be triggered
-          toast.success(`Client ${client.name} has been updated`);
+          // IMPORTANT: This is the ONLY place where toast notifications for supplier updates should be triggered
+          toast.success(`Supplier ${supplier.name} has been updated`);
           setFormOpen(false);
 
           // Invalidate queries to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['clients', page, size] });
+          queryClient.invalidateQueries({ queryKey: ['suppliers', page, size] });
         },
         onError: (error) => {
-          toast.error(`Failed to update client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          toast.error(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
         },
         // This is crucial - it ensures no other handlers will run
         onSettled: () => {
@@ -195,20 +195,20 @@ const ClientManagement = () => {
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Client Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Supplier Management</h1>
             <p className="text-muted-foreground">
-              Manage your customer base and client information
+              Manage your supplier base and supplier information
             </p>
           </div>
           <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="mr-2 h-4 w-4" />
-            Add Client
+            Add Supplier
           </Button>
         </div>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle>Clients</CardTitle>
+            <CardTitle>Suppliers</CardTitle>
             <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
               <div className="relative w-full">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -241,42 +241,42 @@ const ClientManagement = () => {
                       <TableCell colSpan={6} className="h-24 text-center">
                         <div className="flex justify-center items-center">
                           <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                          Loading clients...
+                          Loading suppliers...
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : isError ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-red-500">
-                        Error loading clients. Please try again.
+                        Error loading suppliers. Please try again.
                       </TableCell>
                     </TableRow>
-                  ) : filteredClients.length > 0 ? (
-                    filteredClients.map((client) => (
-                      <TableRow key={client.id}>
-                        <TableCell className="font-medium">{client.id}</TableCell>
+                  ) : filteredSuppliers.length > 0 ? (
+                    filteredSuppliers.map((supplier) => (
+                      <TableRow key={supplier.id}>
+                        <TableCell className="font-medium">{supplier.id}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <UserCircle size={16} className="text-blue-600" />
-                            <span>{client.name}</span>
+                            <span>{supplier.name}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Mail size={14} className="text-gray-500" />
-                            <span>{client.email}</span>
+                            <span>{supplier.email}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Phone size={14} className="text-gray-500" />
-                            <span>{client.phone}</span>
+                            <span>{supplier.phone}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <MapPin size={14} className="text-gray-500" />
-                            <span className="truncate max-w-[200px]">{client.address}</span>
+                            <span className="truncate max-w-[200px]">{supplier.address}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -287,12 +287,12 @@ const ClientManagement = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(client)}>
+                              <DropdownMenuItem onClick={() => handleEdit(supplier)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => handleDeleteIntent(client)}
+                                onClick={() => handleDeleteIntent(supplier)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -306,7 +306,7 @@ const ClientManagement = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
-                        No clients found.
+                        No suppliers found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -318,7 +318,7 @@ const ClientManagement = () => {
             {!isLoading && !isError && totalCount > 0 && (
               <div className="flex items-center justify-between space-x-6 mt-4">
                 <div className="text-sm text-muted-foreground">
-                  Showing {clients.length} of {totalCount} clients
+                  Showing {suppliers.length} of {totalCount} suppliers
                 </div>
                 <Pagination>
                   <PaginationContent>
@@ -348,11 +348,11 @@ const ClientManagement = () => {
         </Card>
       </div>
 
-      <ClientForm 
+      <SupplierForm 
         open={formOpen} 
         onOpenChange={setFormOpen} 
         onSubmit={handleFormSubmit} 
-        client={currentClient}
+        supplier={currentSupplier}
         mode={formMode} 
       />
 
@@ -361,7 +361,7 @@ const ClientManagement = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the client <strong>{currentClient?.name}</strong>.
+              This will permanently delete the supplier <strong>{currentSupplier?.name}</strong>.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -377,4 +377,4 @@ const ClientManagement = () => {
   );
 };
 
-export default ClientManagement;
+export default SupplierManagement;

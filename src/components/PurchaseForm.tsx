@@ -5,49 +5,49 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
-import { unitApi, productApi, clientApi, Product, OrderCreationRequest, OrderItemRequest } from '@/lib/api';
+import { unitApi, productApi, supplierApi, Product, PurchaseCreationRequest, PurchaseItemCreationRequest } from '@/lib/api';
 import { Loader2, Search, Plus, Trash } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Interface for the form data
-export interface OrderFormData extends Omit<OrderCreationRequest, 'orderItems'> {
+export interface PurchaseFormData extends Omit<PurchaseCreationRequest, 'purchaseItems'> {
   id?: number;
   // Use array instead of Set for easier state management
-  orderItems: Array<OrderItemRequest & { productName?: string }>;
+  purchaseItems: Array<PurchaseItemCreationRequest & { productName?: string }>;
 }
 
-interface OrderFormProps {
+interface PurchaseFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (order: OrderCreationRequest) => void;
+  onSubmit: (purchase: PurchaseCreationRequest) => void;
   isLoading?: boolean;
 }
 
-interface Client {
+interface Supplier {
   id: number;
   name: string;
 }
 
-const OrderForm = ({ 
+const PurchaseForm = ({ 
   open, 
   onOpenChange, 
   onSubmit, 
   isLoading = false
-}: OrderFormProps) => {
+}: PurchaseFormProps) => {
   // Initialize form data with default values
-  const [formData, setFormData] = useState<OrderFormData>({
-    orderReference: `ORD-${Math.floor(Math.random() * 10000)}`,
-    orderDate: format(new Date(), 'yyyy-MM-dd'),
-    clientId: 0,
-    orderItems: []
+  const [formData, setFormData] = useState<PurchaseFormData>({
+    purchaseReference: `PUR-${Math.floor(Math.random() * 10000)}`,
+    purchaseDate: format(new Date(), 'yyyy-MM-dd'),
+    supplierId: 0,
+    purchaseItems: []
   });
 
-  // State for client search
-  const [clientSearchTerm, setClientSearchTerm] = useState('');
-  const [isClientSearching, setIsClientSearching] = useState(false);
-  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
-  const [selectedClientName, setSelectedClientName] = useState('');
-  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // State for supplier search
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
+  const [isSupplierSearching, setIsSupplierSearching] = useState(false);
+  const [supplierSearchResults, setSupplierSearchResults] = useState<Supplier[]>([]);
+  const [selectedSupplierName, setSelectedSupplierName] = useState('');
+  const supplierSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // State for product search
   const [productSearchTerm, setProductSearchTerm] = useState('');
@@ -85,12 +85,12 @@ const OrderForm = ({
   useEffect(() => {
     if (open) {
       setFormData({
-        orderReference: `ORD-${Math.floor(Math.random() * 10000)}`,
-        orderDate: format(new Date(), 'yyyy-MM-dd'),
-        clientId: 0,
-        orderItems: []
+        purchaseReference: `PUR-${Math.floor(Math.random() * 10000)}`,
+        purchaseDate: format(new Date(), 'yyyy-MM-dd'),
+        supplierId: 0,
+        purchaseItems: []
       });
-      setSelectedClientName('');
+      setSelectedSupplierName('');
       setCurrentItem({
         productId: 0,
         productName: '',
@@ -111,31 +111,31 @@ const OrderForm = ({
     }
   }, [units, currentItem.unitId]);
 
-  // Handle client search
-  const handleClientSearch = (term: string) => {
-    setClientSearchTerm(term);
+  // Handle supplier search
+  const handleSupplierSearch = (term: string) => {
+    setSupplierSearchTerm(term);
 
     // Clear previous timeout
-    if (clientSearchTimeoutRef.current) {
-      clearTimeout(clientSearchTimeoutRef.current);
+    if (supplierSearchTimeoutRef.current) {
+      clearTimeout(supplierSearchTimeoutRef.current);
     }
 
     if (term.trim().length < 2) {
-      setClientSearchResults([]);
+      setSupplierSearchResults([]);
       return;
     }
 
     // Set a timeout to avoid too many API calls
-    clientSearchTimeoutRef.current = setTimeout(async () => {
-      setIsClientSearching(true);
+    supplierSearchTimeoutRef.current = setTimeout(async () => {
+      setIsSupplierSearching(true);
       try {
-        const response = await clientApi.search(term);
-        setClientSearchResults(response.data.items);
+        const response = await supplierApi.search(term);
+        setSupplierSearchResults(response.data.items);
       } catch (error) {
-        console.error('Error searching clients:', error);
-        setClientSearchResults([]);
+        console.error('Error searching suppliers:', error);
+        setSupplierSearchResults([]);
       } finally {
-        setIsClientSearching(false);
+        setIsSupplierSearching(false);
       }
     }, 300);
   };
@@ -170,7 +170,7 @@ const OrderForm = ({
   };
 
   // Handle form field changes
-  const handleChange = (field: keyof OrderFormData, value: string | number) => {
+  const handleChange = (field: keyof PurchaseFormData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error for this field
     if (errors[field]) {
@@ -195,15 +195,15 @@ const OrderForm = ({
     }
   };
 
-  // Handle client selection
-  const handleClientSelect = (client: Client) => {
+  // Handle supplier selection
+  const handleSupplierSelect = (supplier: Supplier) => {
     setFormData((prev) => ({
       ...prev,
-      clientId: client.id
+      supplierId: supplier.id
     }));
-    setSelectedClientName(client.name);
-    setClientSearchResults([]);
-    setClientSearchTerm('');
+    setSelectedSupplierName(supplier.name);
+    setSupplierSearchResults([]);
+    setSupplierSearchTerm('');
   };
 
   // Handle product selection
@@ -217,7 +217,7 @@ const OrderForm = ({
     setProductSearchTerm('');
   };
 
-  // Add current item to order items
+  // Add current item to purchase items
   const handleAddItem = () => {
     // Validate current item
     const itemErrors: Record<string, string> = {};
@@ -239,11 +239,11 @@ const OrderForm = ({
       return;
     }
 
-    // Add item to order items
+    // Add item to purchase items
     setFormData(prev => ({
       ...prev,
-      orderItems: [
-        ...prev.orderItems,
+      purchaseItems: [
+        ...prev.purchaseItems,
         {
           productId: currentItem.productId,
           productName: currentItem.productName,
@@ -262,11 +262,11 @@ const OrderForm = ({
     });
   };
 
-  // Remove item from order items
+  // Remove item from purchase items
   const handleRemoveItem = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      orderItems: prev.orderItems.filter((_, i) => i !== index)
+      purchaseItems: prev.purchaseItems.filter((_, i) => i !== index)
     }));
   };
 
@@ -274,20 +274,20 @@ const OrderForm = ({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.orderReference) {
-      newErrors.orderReference = 'Order reference is required';
+    if (!formData.purchaseReference) {
+      newErrors.purchaseReference = 'Purchase reference is required';
     }
 
-    if (!formData.orderDate) {
-      newErrors.orderDate = 'Order date is required';
+    if (!formData.purchaseDate) {
+      newErrors.purchaseDate = 'Purchase date is required';
     }
 
-    if (!formData.clientId || formData.clientId <= 0) {
-      newErrors.clientId = 'Client is required';
+    if (!formData.supplierId || formData.supplierId <= 0) {
+      newErrors.supplierId = 'Supplier is required';
     }
 
-    if (formData.orderItems.length === 0) {
-      newErrors.orderItems = 'At least one order item is required';
+    if (formData.purchaseItems.length === 0) {
+      newErrors.purchaseItems = 'At least one purchase item is required';
     }
 
     setErrors(newErrors);
@@ -299,19 +299,19 @@ const OrderForm = ({
     e.preventDefault();
 
     if (validateForm()) {
-      // Create an array of order items without UI-specific fields
-      const orderItemsArray = formData.orderItems.map(item => ({
+      // Create an array of purchase items without UI-specific fields
+      const purchaseItemsArray = formData.purchaseItems.map(item => ({
         productId: item.productId,
         unitId: item.unitId,
         quantity: item.quantity
       }));
 
       // Create a copy of formData without UI-specific fields
-      const submitData: OrderCreationRequest = {
-        orderReference: formData.orderReference,
-        orderDate: formData.orderDate,
-        clientId: formData.clientId,
-        orderItems: orderItemsArray
+      const submitData: PurchaseCreationRequest = {
+        purchaseReference: formData.purchaseReference,
+        purchaseDate: formData.purchaseDate,
+        supplierId: formData.supplierId,
+        purchaseItems: purchaseItemsArray
       };
 
       onSubmit(submitData);
@@ -329,65 +329,65 @@ const OrderForm = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create New Order</DialogTitle>
+          <DialogTitle>Create New Purchase</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Basic Order Information */}
+          {/* Basic Purchase Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Order Reference */}
+            {/* Purchase Reference */}
             <div className="space-y-2">
-              <Label htmlFor="orderReference">Order Reference</Label>
+              <Label htmlFor="purchaseReference">Purchase Reference</Label>
               <Input
-                id="orderReference"
-                value={formData.orderReference}
-                onChange={(e) => handleChange('orderReference', e.target.value)}
-                className={errors.orderReference ? 'border-red-500' : ''}
+                id="purchaseReference"
+                value={formData.purchaseReference}
+                onChange={(e) => handleChange('purchaseReference', e.target.value)}
+                className={errors.purchaseReference ? 'border-red-500' : ''}
               />
-              {errors.orderReference && (
-                <p className="text-xs text-red-500">{errors.orderReference}</p>
+              {errors.purchaseReference && (
+                <p className="text-xs text-red-500">{errors.purchaseReference}</p>
               )}
             </div>
 
-            {/* Order Date */}
+            {/* Purchase Date */}
             <div className="space-y-2">
-              <Label htmlFor="orderDate">Order Date</Label>
+              <Label htmlFor="purchaseDate">Purchase Date</Label>
               <Input
-                id="orderDate"
+                id="purchaseDate"
                 type="date"
-                value={formData.orderDate}
-                onChange={(e) => handleChange('orderDate', e.target.value)}
-                className={errors.orderDate ? 'border-red-500' : ''}
+                value={formData.purchaseDate}
+                onChange={(e) => handleChange('purchaseDate', e.target.value)}
+                className={errors.purchaseDate ? 'border-red-500' : ''}
               />
-              {errors.orderDate && (
-                <p className="text-xs text-red-500">{errors.orderDate}</p>
+              {errors.purchaseDate && (
+                <p className="text-xs text-red-500">{errors.purchaseDate}</p>
               )}
             </div>
           </div>
 
-          {/* Client Search */}
+          {/* Supplier Search */}
           <div className="space-y-2">
-            <Label htmlFor="client">Client</Label>
+            <Label htmlFor="supplier">Supplier</Label>
             <div className="relative">
               <div className="flex items-center">
                 <Input
-                  id="client"
-                  value={clientSearchTerm}
-                  onChange={(e) => handleClientSearch(e.target.value)}
-                  placeholder="Search for a client"
-                  className={errors.clientId ? 'border-red-500 pr-10' : 'pr-10'}
+                  id="supplier"
+                  value={supplierSearchTerm}
+                  onChange={(e) => handleSupplierSearch(e.target.value)}
+                  placeholder="Search for a supplier"
+                  className={errors.supplierId ? 'border-red-500 pr-10' : 'pr-10'}
                 />
-                {isClientSearching ? (
+                {isSupplierSearching ? (
                   <Loader2 className="h-4 w-4 animate-spin absolute right-3" />
                 ) : (
                   <Search className="h-4 w-4 absolute right-3 text-gray-400" />
                 )}
               </div>
 
-              {/* Selected client display */}
-              {formData.clientId > 0 && selectedClientName && (
+              {/* Selected supplier display */}
+              {formData.supplierId > 0 && selectedSupplierName && (
                 <div className="mt-2 p-2 bg-blue-50 rounded-md flex justify-between items-center">
-                  <span className="text-sm font-medium">{selectedClientName}</span>
+                  <span className="text-sm font-medium">{selectedSupplierName}</span>
                   <Button 
                     type="button" 
                     variant="ghost" 
@@ -395,9 +395,9 @@ const OrderForm = ({
                     onClick={() => {
                       setFormData(prev => ({
                         ...prev,
-                        clientId: 0
+                        supplierId: 0
                       }));
-                      setSelectedClientName('');
+                      setSelectedSupplierName('');
                     }}
                   >
                     ×
@@ -406,30 +406,30 @@ const OrderForm = ({
               )}
 
               {/* Search results dropdown */}
-              {clientSearchResults.length > 0 && (
+              {supplierSearchResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
                   <ul className="py-1">
-                    {clientSearchResults.map(client => (
+                    {supplierSearchResults.map(supplier => (
                       <li 
-                        key={client.id}
+                        key={supplier.id}
                         className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                        onClick={() => handleClientSelect(client)}
+                        onClick={() => handleSupplierSelect(supplier)}
                       >
-                        {client.name}
+                        {supplier.name}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
             </div>
-            {errors.clientId && (
-              <p className="text-xs text-red-500">{errors.clientId}</p>
+            {errors.supplierId && (
+              <p className="text-xs text-red-500">{errors.supplierId}</p>
             )}
           </div>
 
-          {/* Order Items Section */}
+          {/* Purchase Items Section */}
           <div className="space-y-4 border p-4 rounded-md">
-            <h3 className="font-medium">Order Items</h3>
+            <h3 className="font-medium">Purchase Items</h3>
 
             {/* Add new item form */}
             <div className="grid grid-cols-1 gap-4">
@@ -559,12 +559,12 @@ const OrderForm = ({
               </Button>
             </div>
 
-            {/* Order Items List */}
-            {formData.orderItems.length > 0 ? (
+            {/* Purchase Items List */}
+            {formData.purchaseItems.length > 0 ? (
               <div className="mt-4 space-y-2">
-                <h4 className="text-sm font-medium">Items in this order:</h4>
+                <h4 className="text-sm font-medium">Items in this purchase:</h4>
                 <div className="max-h-60 overflow-y-auto space-y-2">
-                  {formData.orderItems.map((item, index) => (
+                  {formData.purchaseItems.map((item, index) => (
                     <div key={index} className="p-2 bg-gray-50 rounded-md">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">{item.productName}</span>
@@ -586,12 +586,12 @@ const OrderForm = ({
               </div>
             ) : (
               <div className="text-center py-4 text-gray-500">
-                No items added to this order yet
+                No items added to this purchase yet
               </div>
             )}
 
-            {errors.orderItems && (
-              <p className="text-xs text-red-500">{errors.orderItems}</p>
+            {errors.purchaseItems && (
+              <p className="text-xs text-red-500">{errors.purchaseItems}</p>
             )}
           </div>
 
@@ -615,7 +615,7 @@ const OrderForm = ({
                   Creating...
                 </>
               ) : (
-                'Create Order'
+                'Create Purchase'
               )}
             </Button>
           </DialogFooter>
@@ -625,4 +625,4 @@ const OrderForm = ({
   );
 };
 
-export default OrderForm;
+export default PurchaseForm;

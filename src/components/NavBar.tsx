@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Users,
   Boxes,
-  ShoppingCart
+  ShoppingCart,
+  ShoppingBag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -29,9 +30,12 @@ const NavBar = () => {
     { name: 'Dashboard', path: '/dashboard', icon: <FileText size={20} /> },
     { name: 'Users', path: '/users', icon: <User size={20} /> },
     { name: 'Clients', path: '/clients', icon: <Users size={20} /> },
+    { name: 'Suppliers', path: '/suppliers', icon: <Users size={20} /> },
     { name: 'Warehouses', path: '/warehouses', icon: <Warehouse size={20} /> },
     { name: 'Stock', path: '/stock', icon: <Boxes size={20} /> },
+    { name: 'Products', path: '/products', icon: <Package size={20} /> },
     { name: 'Orders', path: '/orders', icon: <ShoppingCart size={20} /> },
+    { name: 'Purchases', path: '/purchases', icon: <ShoppingBag size={20} /> },
     { name: 'Shipments', path: '/shipments', icon: <Truck size={20} /> },
   ];
 

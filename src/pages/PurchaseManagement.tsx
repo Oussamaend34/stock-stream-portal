@@ -21,7 +21,7 @@ import {
   Package, 
   Search, 
   Loader2, 
-  ShoppingCart, 
+  ShoppingBag, 
   Calendar,
   User,
   Download,
@@ -30,8 +30,8 @@ import {
   X,
   Plus
 } from 'lucide-react';
-import OrderForm from '@/components/OrderForm';
 import { toast } from 'sonner';
+import PurchaseForm from '@/components/PurchaseForm';
 import {
   Pagination,
   PaginationContent,
@@ -42,7 +42,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { orderApi, clientApi, OrderCreationRequest } from '@/lib/api';
+import { purchaseApi, PurchaseDTO, Container, TransactionDetailsDTO, PurchaseCreationRequest } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import {
   Select,
@@ -60,127 +60,61 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { useForm, FormProvider, useFormContext, Controller } from "react-hook-form";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 
-// Define the order data structure based on the DTO
-interface TransactionDetailsDTO {
-  id: number;
-  productName: string;
-  unit: string;
-  quantity: number;
-}
-
-interface OrderDTO {
-  id: number;
-  orderReference: string;
-  clientName: string;
-  orderDate: string; // ISO date string format
-  orderItems: TransactionDetailsDTO[];
-}
-
-
-// Define Client and Product interfaces
-interface ClientDTO {
-  id: number;
-  name: string;
-  email?: string;
-  phone?: string;
-}
-
-interface ProductDTO {
-  id: number;
-  name: string;
-  description?: string;
-}
-
-interface UnitDTO {
-  id: number;
-  name: string;
-  symbol: string;
-}
-
-// Define the paginated response structure
-interface OrderContainer {
-  TotalNumberOfElements: number;
-  pageElements: OrderDTO[];
-}
-
-const OrderManagement = () => {
+const PurchaseManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1); // 1-based pagination
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
-  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [isPurchaseFormOpen, setIsPurchaseFormOpen] = useState(false);
+  const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Fetch order data with pagination
+  // Fetch purchase data with pagination
   const {
-    data: orderData,
+    data: purchaseData,
     isLoading,
     isError,
     error
-  } = useQuery<OrderDTO[]>({
-    queryKey: ['orders', currentPage, pageSize],
+  } = useQuery<Container<PurchaseDTO>>({
+    queryKey: ['purchases', currentPage, pageSize],
     queryFn: async () => {
-      const response = await orderApi.getAll(currentPage, pageSize);
+      const response = await purchaseApi.getAll(currentPage, pageSize);
       return response.data;
     },
     refetchOnWindowFocus: false
   });
 
-  // Get total count of orders for pagination
-  const { 
-    data: totalOrdersCount
-  } = useQuery<number>({
-    queryKey: ['ordersCount'],
-    queryFn: async () => {
-      const response = await orderApi.getTotalCount();
-      return response.data;
-    },
-    refetchOnWindowFocus: false
-  });
-
-  // If we have a selected order ID, fetch the specific order details for the dialog
+  // If we have a selected purchase ID, fetch the specific purchase details for the dialog
   const {
-    data: selectedOrderDetails,
-    isLoading: isLoadingSelectedOrder,
-    isError: isErrorSelectedOrder,
-    refetch: refetchSelectedOrder
-  } = useQuery<OrderDTO>({
-    queryKey: ['order', selectedOrderId],
+    data: selectedPurchaseDetails,
+    isLoading: isLoadingSelectedPurchase,
+    isError: isErrorSelectedPurchase
+  } = useQuery<PurchaseDTO>({
+    queryKey: ['purchase', selectedPurchaseId],
     queryFn: async () => {
-      const response = await orderApi.getById(Number(selectedOrderId));
+      const response = await purchaseApi.getById(Number(selectedPurchaseId));
       return response.data;
     },
-    enabled: !!selectedOrderId,
+    enabled: !!selectedPurchaseId,
     refetchOnWindowFocus: false
   });
 
   // Handle success and error states
   useEffect(() => {
-    if (totalOrdersCount !== undefined) {
-      setTotalElements(totalOrdersCount);
-      setTotalPages(Math.ceil(totalOrdersCount / pageSize));
+    if (purchaseData) {
+      setTotalElements(purchaseData.count);
+      setTotalPages(Math.ceil(purchaseData.count / pageSize));
     }
-  }, [totalOrdersCount, pageSize]);
+  }, [purchaseData, pageSize]);
 
   useEffect(() => {
     if (isError && error) {
-      toast.error(`Failed to fetch order data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to fetch purchase data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [isError, error]);
 
@@ -217,17 +151,17 @@ const OrderManagement = () => {
     setCurrentPage(boundedPage);
   };
 
-  // Filter orders based on search term
-  const filteredOrders = useMemo(() => {
-    if (!orderData || !Array.isArray(orderData)) {
+  // Filter purchases based on search term
+  const filteredPurchases = useMemo(() => {
+    if (!purchaseData || !purchaseData.items) {
       return [];
     }
 
-    return orderData.filter(order =>
-      order.orderReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+    return purchaseData.items.filter(purchase =>
+      purchase.purchaseReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      purchase.supplierName.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [orderData, searchTerm]);
+  }, [purchaseData, searchTerm]);
 
   // Generate pagination items
   const generatePaginationItems = () => {
@@ -310,12 +244,12 @@ const OrderManagement = () => {
     }
   };
 
-  const getTotalItems = (order: OrderDTO) => {
-    return order.orderItems ? order.orderItems.length : 0;
+  const getTotalItems = (purchase: PurchaseDTO) => {
+    return purchase.purchaseItems ? purchase.purchaseItems.length : 0;
   };
 
-  // Render the order table with current data
-  const renderOrdersTable = () => {
+  // Render the purchase table with current data
+  const renderPurchasesTable = () => {
     return (
       <div className="rounded-md border">
         <Table>
@@ -323,7 +257,7 @@ const OrderManagement = () => {
             <TableRow>
               <TableHead className="w-[80px]">ID</TableHead>
               <TableHead>Reference</TableHead>
-              <TableHead>Client</TableHead>
+              <TableHead>Supplier</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Items</TableHead>
             </TableRow>
@@ -334,48 +268,48 @@ const OrderManagement = () => {
                 <TableCell colSpan={5} className="h-24 text-center">
                   <div className="flex justify-center items-center">
                     <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    Loading orders...
+                    Loading purchases...
                   </div>
                 </TableCell>
               </TableRow>
             ) : isError ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center text-red-500">
-                  Error loading orders. Please try again.
+                  Error loading purchases. Please try again.
                 </TableCell>
               </TableRow>
-            ) : filteredOrders.length > 0 ? (
-              filteredOrders.map((order) => (
+            ) : filteredPurchases.length > 0 ? (
+              filteredPurchases.map((purchase) => (
                 <TableRow 
-                  key={order.id} 
+                  key={purchase.id} 
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => {
-                    setSelectedOrderId(order.id);
+                    setSelectedPurchaseId(purchase.id);
                     setIsDialogOpen(true);
                   }}
                 >
-                  <TableCell className="font-medium">{order.id}</TableCell>
+                  <TableCell className="font-medium">{purchase.id}</TableCell>
                   <TableCell>
                     <div className="font-medium text-blue-600 hover:underline">
-                      {order.orderReference}
+                      {purchase.purchaseReference}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center">
                       <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                      {order.clientName}
+                      {purchase.supplierName}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                      {formatDate(order.orderDate)}
+                      {formatDate(purchase.purchaseDate)}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center">
                       <Package className="h-4 w-4 mr-2 text-muted-foreground" />
-                      {getTotalItems(order)}
+                      {getTotalItems(purchase)}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -383,7 +317,7 @@ const OrderManagement = () => {
             ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    No orders found.
+                    No purchases found.
                   </TableCell>
                 </TableRow>
             )}
@@ -393,74 +327,66 @@ const OrderManagement = () => {
     );
   };
 
-  // Handle order creation
-  const handleCreateOrder = async (orderData: OrderCreationRequest) => {
-    setIsCreatingOrder(true);
+  // Handle purchase creation
+  const handleCreatePurchase = async (purchaseData: PurchaseCreationRequest) => {
+    setIsCreatingPurchase(true);
     try {
-      await orderApi.create(orderData);
-      toast.success('Order created successfully');
-      setIsOrderFormOpen(false);
+      await purchaseApi.create(purchaseData);
+      toast.success('Purchase created successfully');
+      setIsPurchaseFormOpen(false);
 
       // Invalidate queries to refetch the latest data
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['ordersCount'] });
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['purchasesCount'] });
     } catch (error) {
-      console.error('Error creating order:', error);
-      toast.error('Failed to create order. Please try again.');
+      console.error('Error creating purchase:', error);
+      toast.error('Failed to create purchase. Please try again.');
     } finally {
-      setIsCreatingOrder(false);
+      setIsCreatingPurchase(false);
     }
   };
 
-  // Handle order creation success
-  const handleOrderCreationSuccess = () => {
-    // Invalidate queries to refetch the latest data
-    queryClient.invalidateQueries({ queryKey: ['orders'] });
-    queryClient.invalidateQueries({ queryKey: ['ordersCount'] });
-    toast.success('Order list has been refreshed with new data');
-  };
-
-  // Main orders listing view
+  // Main purchases listing view
   return (
     <>
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <ShoppingCart className="h-8 w-8 text-primary" />
+            <ShoppingBag className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Order Management</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Purchase Management</h1>
               <p className="text-muted-foreground">
-                View and manage customer orders
+                View and manage supplier purchases
               </p>
             </div>
           </div>
           <div className="flex space-x-2">
             <Button 
-              onClick={() => setIsOrderFormOpen(true)}
+              onClick={() => setIsPurchaseFormOpen(true)}
               className="bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Create Order
+              Create Purchase
             </Button>
             <Button variant="outline" onClick={() => {
-              // Create CSV content from filteredOrders
-              if (filteredOrders.length === 0) {
+              // Create CSV content from filteredPurchases
+              if (filteredPurchases.length === 0) {
                 toast.error("No data to export");
                 return;
               }
 
               // Create headers
-              const headers = ['ID', 'Order Reference', 'Client Name', 'Order Date', 'Items Count'];
+              const headers = ['ID', 'Purchase Reference', 'Supplier Name', 'Purchase Date', 'Items Count'];
               const csvRows = [headers.join(',')];
 
               // Create rows
-              filteredOrders.forEach(order => {
+              filteredPurchases.forEach(purchase => {
                 const row = [
-                  order.id,
-                  `"${order.orderReference.replace(/"/g, '""')}"`, // Escape quotes
-                  `"${order.clientName.replace(/"/g, '""')}"`, // Escape quotes
-                  order.orderDate,
-                  getTotalItems(order)
+                  purchase.id,
+                  `"${purchase.purchaseReference.replace(/"/g, '""')}"`, // Escape quotes
+                  `"${purchase.supplierName.replace(/"/g, '""')}"`, // Escape quotes
+                  purchase.purchaseDate,
+                  getTotalItems(purchase)
                 ];
                 csvRows.push(row.join(','));
               });
@@ -473,13 +399,13 @@ const OrderManagement = () => {
               const url = URL.createObjectURL(blob);
               const link = document.createElement('a');
               link.setAttribute('href', url);
-              link.setAttribute('download', `order-data-${new Date().toISOString().slice(0,10)}.csv`);
+              link.setAttribute('download', `purchase-data-${new Date().toISOString().slice(0,10)}.csv`);
               link.style.visibility = 'hidden';
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
 
-              toast.success("Order data exported to CSV");
+              toast.success("Purchase data exported to CSV");
             }}>
               <Download className="mr-2 h-4 w-4" />
               Export
@@ -491,29 +417,29 @@ const OrderManagement = () => {
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalElements.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                Across all clients
+                Across all suppliers
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Recent Orders</CardTitle>
+              <CardTitle className="text-sm font-medium">Recent Purchases</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col">
                 <div className="text-3xl font-bold text-blue-600">
-                  {filteredOrders.filter(order => {
-                    // Filter orders from the last 7 days
-                    const orderDate = new Date(order.orderDate);
+                  {filteredPurchases.filter(purchase => {
+                    // Filter purchases from the last 7 days
+                    const purchaseDate = new Date(purchase.purchaseDate);
                     const sevenDaysAgo = new Date();
                     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                    return orderDate >= sevenDaysAgo;
+                    return purchaseDate >= sevenDaysAgo;
                   }).length}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -529,10 +455,10 @@ const OrderManagement = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {filteredOrders.reduce((sum, order) => sum + getTotalItems(order), 0).toLocaleString()}
+                {filteredPurchases.reduce((sum, purchase) => sum + getTotalItems(purchase), 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                Products ordered
+                Products purchased
               </p>
             </CardContent>
           </Card>
@@ -543,12 +469,12 @@ const OrderManagement = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {filteredOrders.length > 0 
-                  ? Math.round(filteredOrders.reduce((sum, order) => sum + getTotalItems(order), 0) / filteredOrders.length).toLocaleString() 
+                {filteredPurchases.length > 0 
+                  ? Math.round(filteredPurchases.reduce((sum, purchase) => sum + getTotalItems(purchase), 0) / filteredPurchases.length).toLocaleString() 
                   : 0}
               </div>
               <p className="text-xs text-muted-foreground">
-                Items per order
+                Items per purchase
               </p>
             </CardContent>
           </Card>
@@ -557,14 +483,14 @@ const OrderManagement = () => {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex justify-between items-center">
-              <CardTitle>Orders</CardTitle>
+              <CardTitle>Purchases</CardTitle>
             </div>
             <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
               <div className="relative w-full">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search by order reference or client..."
+                  placeholder="Search by purchase reference or supplier..."
                   className="w-full pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -573,15 +499,15 @@ const OrderManagement = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {renderOrdersTable()}
+            {renderPurchasesTable()}
 
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center space-x-2">
                 <p className="text-sm text-muted-foreground">
-                  Showing {filteredOrders.length} of {totalElements} orders
+                  Showing {filteredPurchases.length} of {totalElements} purchases
                 </p>
                 <div className="flex items-center space-x-2">
-                  <p className="text-sm text-muted-foreground">Orders per page</p>
+                  <p className="text-sm text-muted-foreground">Purchases per page</p>
                   <Select
                     value={pageSize.toString()}
                     onValueChange={(value) => handlePageSizeChange(parseInt(value))}
@@ -638,50 +564,50 @@ const OrderManagement = () => {
         </Card>
       </div>
 
-      {/* Order Details Dialog */}
+      {/* Purchase Details Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center">
-              <ShoppingCart className="h-5 w-5 mr-2 text-primary" />
-              Order Details
+              <ShoppingBag className="h-5 w-5 mr-2 text-primary" />
+              Purchase Details
             </DialogTitle>
             <DialogDescription>
-              {selectedOrderDetails?.orderReference ? 
-                `Order Reference: ${selectedOrderDetails.orderReference}` : 
-                'Loading order details...'}
+              {selectedPurchaseDetails?.purchaseReference ? 
+                `Purchase Reference: ${selectedPurchaseDetails.purchaseReference}` : 
+                'Loading purchase details...'}
             </DialogDescription>
           </DialogHeader>
 
-          {isLoadingSelectedOrder ? (
+          {isLoadingSelectedPurchase ? (
             <div className="flex justify-center items-center py-8">
               <Loader2 className="h-8 w-8 animate-spin mr-2" />
-              <span>Loading order details...</span>
+              <span>Loading purchase details...</span>
             </div>
-          ) : isErrorSelectedOrder ? (
+          ) : isErrorSelectedPurchase ? (
             <div className="flex flex-col items-center justify-center py-8 text-red-500">
               <AlertTriangle className="h-12 w-12 mb-2" />
-              <h3 className="text-lg font-medium">Failed to load order details</h3>
-              <p>There was an error loading the order information.</p>
+              <h3 className="text-lg font-medium">Failed to load purchase details</h3>
+              <p>There was an error loading the purchase information.</p>
             </div>
-          ) : selectedOrderDetails ? (
+          ) : selectedPurchaseDetails ? (
             <>
               <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mb-4">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Client</CardTitle>
+                    <CardTitle className="text-sm font-medium">Supplier</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-lg font-bold">{selectedOrderDetails.clientName}</div>
+                    <div className="text-lg font-bold">{selectedPurchaseDetails.supplierName}</div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Order Date</CardTitle>
+                    <CardTitle className="text-sm font-medium">Purchase Date</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-lg font-bold">{formatDate(selectedOrderDetails.orderDate)}</div>
+                    <div className="text-lg font-bold">{formatDate(selectedPurchaseDetails.purchaseDate)}</div>
                   </CardContent>
                 </Card>
 
@@ -691,7 +617,7 @@ const OrderManagement = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-lg font-bold">
-                      {selectedOrderDetails.orderItems.reduce((sum, item) => sum + item.quantity, 0)}
+                      {selectedPurchaseDetails.purchaseItems.reduce((sum, item) => sum + item.quantity, 0)}
                     </div>
                   </CardContent>
                 </Card>
@@ -708,8 +634,8 @@ const OrderManagement = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedOrderDetails.orderItems && selectedOrderDetails.orderItems.length > 0 ? (
-                      selectedOrderDetails.orderItems.map((item) => (
+                    {selectedPurchaseDetails.purchaseItems && selectedPurchaseDetails.purchaseItems.length > 0 ? (
+                      selectedPurchaseDetails.purchaseItems.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.id}</TableCell>
                           <TableCell>
@@ -722,7 +648,7 @@ const OrderManagement = () => {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={4} className="h-24 text-center">
-                          No items found for this order.
+                          No items found for this purchase.
                         </TableCell>
                       </TableRow>
                     )}
@@ -740,15 +666,15 @@ const OrderManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Order Form Dialog */}
-      <OrderForm
-        open={isOrderFormOpen}
-        onOpenChange={setIsOrderFormOpen}
-        onSubmit={handleCreateOrder}
-        isLoading={isCreatingOrder}
+      {/* Purchase Form Dialog */}
+      <PurchaseForm
+        open={isPurchaseFormOpen}
+        onOpenChange={setIsPurchaseFormOpen}
+        onSubmit={handleCreatePurchase}
+        isLoading={isCreatingPurchase}
       />
     </>
   );
 };
 
-export default OrderManagement;
+export default PurchaseManagement;
