@@ -281,6 +281,14 @@ export const unitApi = {
   delete: (id: number) => api.delete(`/units/${id}`),
 };
 
+// Stock API types
+export interface StockFilterRequest {
+  productNames: string[];
+  warehouseIds: number[];
+  minQuantity: number | null;
+  maxQuantity: number | null;
+}
+
 // Stock API endpoints
 export const stockApi = {
   // Get all stocks with pagination
@@ -328,27 +336,17 @@ export const stockApi = {
     minQuantity?: number;
     maxQuantity?: number;
   }, page = 1, size = 10) => {
-    // Clean up filter options to ensure only valid data is sent
-    const cleanFilterOptions = {
-      productNames: filterOptions.productNames?.filter(name => name.trim().length > 0),
-      warehouseIds: filterOptions.warehouseIds?.filter(id => !isNaN(id)),
-      minQuantity: filterOptions.minQuantity !== undefined && !isNaN(filterOptions.minQuantity) ? filterOptions.minQuantity : undefined,
-      maxQuantity: filterOptions.maxQuantity !== undefined && !isNaN(filterOptions.maxQuantity) ? filterOptions.maxQuantity : undefined
+    // Create a StockFilterRequest object that matches the backend model
+    const stockFilterRequest: StockFilterRequest = {
+      productNames: filterOptions.productNames?.filter(name => name.trim().length > 0) || [],
+      warehouseIds: filterOptions.warehouseIds?.filter(id => !isNaN(id)) || [],
+      minQuantity: filterOptions.minQuantity !== undefined && !isNaN(filterOptions.minQuantity) ? filterOptions.minQuantity : null,
+      maxQuantity: filterOptions.maxQuantity !== undefined && !isNaN(filterOptions.maxQuantity) ? filterOptions.maxQuantity : null
     };
 
-    // Remove undefined values and empty arrays before sending
-    const finalFilterOptions = Object.fromEntries(
-      Object.entries(cleanFilterOptions).filter(([_, value]) => {
-        if (Array.isArray(value)) {
-          return value.length > 0;
-        }
-        return value !== undefined;
-      })
-    );
+    console.log('Sending filter request with options:', stockFilterRequest);
 
-    console.log('Sending filter request with options:', finalFilterOptions);
-
-    return api.post('/stocks/filter', finalFilterOptions, {
+    return api.post('/stocks/filter', stockFilterRequest, {
       params: { page, size },
       timeout: 15000  // Increased timeout for complex queries
     });
@@ -387,6 +385,46 @@ export const productApi = {
     timeout: 10000
   }),
   delete: (id: number) => api.delete(`/products/${id}`),
+};
+
+// Transfer API types
+export interface TransferDTO {
+  id: number;
+  transferDate: string; // ISO date string format
+  product: string;
+  sourceWarehouse: string;
+  destinationWarehouse: string;
+  unit: string;
+  quantity: number;
+  remarks: string;
+}
+
+// Transfer Creation Request type
+export interface TransferRequest {
+  productId: number;
+  sourceWarehouseId: number;
+  destinationWarehouseId: number;
+  unitId: number;
+  quantity: number;
+  transferDate: string; // ISO date string format
+  remarks: string;
+}
+
+// For type safety
+export type TransfersContainer = Container<TransferDTO>;
+
+// Transfer API endpoints
+export const transferApi = {
+  getAll: (page = 1, size = 10) => {
+    return api.get('/transfers', {
+      params: { page, size },
+      timeout: 10000
+    });
+  },
+  getById: (id: number) => api.get(`/transfers/${id}`),
+  create: (transferData: TransferRequest) => api.post('/transfers', transferData),
+  update: (id: number, transferData: TransferRequest) => api.put(`/transfers/${id}`, transferData),
+  delete: (id: number) => api.delete(`/transfers/${id}`),
 };
 
 export default api;

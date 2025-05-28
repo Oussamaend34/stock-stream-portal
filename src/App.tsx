@@ -14,6 +14,7 @@ import ClientManagement from "./pages/ClientManagement";
 import SupplierManagement from "./pages/SupplierManagement";
 import StockManagement from "./pages/StockManagement";
 import ProductManagement from "./pages/ProductManagement";
+import TransferManagement from "./pages/TransferManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/purchases" element={<Layout><PurchaseManagement /></Layout>} />
           <Route path="/shipments" element={<Layout><ShipmentManagement /></Layout>} />
           <Route path="/receptions" element={<Layout><ReceptionManagement /></Layout>} />
+          <Route path="/transfers" element={<Layout><TransferManagement /></Layout>} />
           <Route path="/products" element={<Layout><ProductManagement /></Layout>} />
           <Route path="/clients" element={<Layout><ClientManagement /></Layout>} />
           <Route path="/suppliers" element={<Layout><SupplierManagement /></Layout>} />

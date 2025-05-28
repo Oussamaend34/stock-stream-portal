@@ -88,7 +88,7 @@ const StockManagement = () => {
   const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [productId, setProductId] = useState<number | null>(null);
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
-  
+
   // Advanced filter states
   const [selectedProductNames, setSelectedProductNames] = useState<string[]>([]);
   const [selectedWarehouseIds, setSelectedWarehouseIds] = useState<number[]>([]);
@@ -194,7 +194,7 @@ const StockManagement = () => {
       let response;
       // No need to convert page number since API expects 1-based pagination
       const apiPage = currentPage; // Keeping the 1-based pagination for API call
-      
+
       switch (filterType) {
         case 'warehouse':
           if (!warehouseId) throw new Error('Warehouse ID is required for warehouse filter');
@@ -214,16 +214,16 @@ const StockManagement = () => {
             minQuantity: minQuantity !== undefined && minQuantity >= 0 ? minQuantity : undefined,
             maxQuantity: maxQuantity !== undefined && maxQuantity >= 0 ? maxQuantity : undefined
           };
-          
+
           // Log filter options for debugging
           console.log('Advanced filter options:', filterOptions);
-          
+
           response = await stockApi.filter(filterOptions, apiPage, pageSize);
           break;
         default:
           response = await stockApi.getAll(apiPage, pageSize);
       }
-      
+
       return response.data;
     },
     enabled: filterType === 'all' || 
@@ -233,7 +233,7 @@ const StockManagement = () => {
              filterType === 'advanced',
     refetchOnWindowFocus: false
   });
-  
+
   // Handle success and error states
   useEffect(() => {
     if (stockData) {
@@ -241,7 +241,7 @@ const StockManagement = () => {
       setTotalPages(Math.ceil((stockData.TotalNumberOfElements || 0) / pageSize));
     }
   }, [stockData, pageSize]);
-  
+
   useEffect(() => {
     if (isError && error) {
       toast.error(`Failed to fetch stock data: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -252,7 +252,7 @@ const StockManagement = () => {
   const handlePageChange = (newPage: number) => {
     // Ensure we don't go beyond bounds (keeping as 1-based for consistency)
     const boundedPage = Math.max(1, Math.min(newPage, totalPages));
-    
+
     if (boundedPage !== currentPage) {
       setCurrentPage(boundedPage);
     }
@@ -263,21 +263,21 @@ const StockManagement = () => {
     // Calculate which item should stay visible after page size change
     // Adjust for 1-based pagination by using (currentPage - 1) for calculation
     const firstItemIndex = (currentPage - 1) * pageSize;
-    
+
     // Calculate new page number to keep the user viewing the same data
     // Add 1 to maintain 1-based pagination
     const newPage = Math.floor(firstItemIndex / newSize) + 1;
-    
+
     // Ensure we never set page below 1 (since we use 1-based pagination)
     const safeNewPage = Math.max(1, newPage);
-    
+
     // Recalculate total pages with the new page size
     const newTotalPages = Math.max(1, Math.ceil(totalElements / newSize));
-    
+
     // Update state in the correct order
     setPageSize(newSize);
     setTotalPages(newTotalPages);
-    
+
     // Make sure we don't go beyond the new total pages
     const boundedPage = Math.min(safeNewPage, newTotalPages);
     setCurrentPage(boundedPage);
@@ -306,60 +306,66 @@ const StockManagement = () => {
     setWarehouseId(null);
     setProductId(null);
     setCurrentPage(1); // Reset to first page (1-based)
-    
+
     // Reset advanced filter states
     setSelectedProductNames([]);
     setSelectedWarehouseIds([]);
     setMinQuantity(undefined);
     setMaxQuantity(undefined);
-    
+
     // Navigate to the main stock page if we're on a filtered URL
     if (warehouseCode || productIdParam || isLowStockRoute || location.pathname === '/stock/advanced-filter') {
       navigate('/stock');
     }
   };
 
+  /* Add state to control the filter dialog */
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+
   /* Add loading indicator for when advanced filter is being applied */
   const [isApplyingAdvancedFilter, setIsApplyingAdvancedFilter] = useState(false);
-  
-  // Modified handleAdvancedFilter to show loading state
+
+  // Modified handleAdvancedFilter to show loading state and close dialog
   const handleAdvancedFilter = () => {
     setIsApplyingAdvancedFilter(true);
     setFilterType('advanced');
     setCurrentPage(1);
-    
+
+    // Close the filter dialog
+    setIsFilterDialogOpen(false);
+
     // Build URL search params for the advanced filter
     const searchParams = new URLSearchParams();
-    
+
     // Add product names to URL if available - use pipe separator instead of comma
     // Encode each product name individually to properly handle special characters
     if (selectedProductNames.length > 0) {
       const encodedNames = selectedProductNames.map(name => encodeURIComponent(name));
       searchParams.set('products', encodedNames.join('|'));
     }
-    
+
     // Add warehouse IDs to URL if available - use pipe separator instead of comma
     if (selectedWarehouseIds.length > 0) {
       searchParams.set('warehouses', selectedWarehouseIds.join('|'));
     }
-    
+
     // Add min quantity to URL if available
     if (minQuantity !== undefined) {
       searchParams.set('minQty', minQuantity.toString());
     }
-    
+
     // Add max quantity to URL if available
     if (maxQuantity !== undefined) {
       searchParams.set('maxQty', maxQuantity.toString());
     }
-    
+
     // Navigate to the advanced filter route with search params
     // This makes the filtered view shareable via URL
     navigate({
       pathname: '/stock/advanced-filter',
       search: searchParams.toString()
     });
-    
+
     // Turn off loading state after navigation
     setTimeout(() => setIsApplyingAdvancedFilter(false), 500);
   };
@@ -370,7 +376,7 @@ const StockManagement = () => {
     if (!stockData || !Array.isArray(stockData.pageElements)) {
       return [];
     }
-    
+
     return stockData.pageElements.filter(stock =>
       stock.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       stock.WarehouseCode.toLowerCase().includes(searchTerm.toLowerCase())
@@ -381,15 +387,15 @@ const StockManagement = () => {
   const generatePaginationItems = () => {
     const items = [];
     const maxPagesToShow = 5;
-    
+
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-    
+
     // Adjust if we're near the end
     if (endPage - startPage + 1 < maxPagesToShow) {
       startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
-    
+
     // First page
     if (startPage > 1) {
       items.push(
@@ -399,7 +405,7 @@ const StockManagement = () => {
           </PaginationLink>
         </PaginationItem>
       );
-      
+
       // Add ellipsis if needed
       if (startPage > 2) {
         items.push(
@@ -409,7 +415,7 @@ const StockManagement = () => {
         );
       }
     }
-    
+
     // Page numbers
     for (let i = startPage; i <= endPage; i++) {
       items.push(
@@ -420,7 +426,7 @@ const StockManagement = () => {
         </PaginationItem>
       );
     }
-    
+
     // Last page
     if (endPage < totalPages) {
       // Add ellipsis if needed
@@ -431,7 +437,7 @@ const StockManagement = () => {
           </PaginationItem>
         );
       }
-      
+
       items.push(
         <PaginationItem key="last">
           <PaginationLink onClick={() => handlePageChange(totalPages)} isActive={currentPage === totalPages}>
@@ -440,7 +446,7 @@ const StockManagement = () => {
         </PaginationItem>
       );
     }
-    
+
     return items;
   };
 
@@ -451,11 +457,11 @@ const StockManagement = () => {
   // Effect to detect advanced filter route and set state accordingly
   useEffect(() => {
     const isAdvancedFilterRoute = location.pathname === '/stock/advanced-filter';
-    
+
     if (isAdvancedFilterRoute) {
       // Parse URL search params for filter values
       const searchParams = new URLSearchParams(location.search);
-      
+
       // Get product names from URL (pipe-separated)
       const productNamesParam = searchParams.get('products');
       if (productNamesParam) {
@@ -465,7 +471,7 @@ const StockManagement = () => {
             .split('|')
             .map(name => decodeURIComponent(name))
             .filter(name => name.trim().length > 0);
-          
+
           setSelectedProductNames(productNames);
         } catch (error) {
           console.error("Error decoding product names from URL:", error);
@@ -473,7 +479,7 @@ const StockManagement = () => {
           setSelectedProductNames([]);
         }
       }
-      
+
       // Get warehouse IDs from URL (pipe-separated)
       const warehouseIdsParam = searchParams.get('warehouses');
       if (warehouseIdsParam) {
@@ -482,7 +488,7 @@ const StockManagement = () => {
           .filter(id => !isNaN(id));
         setSelectedWarehouseIds(warehouseIds);
       }
-      
+
       // Get min and max quantity from URL
       const minQtyParam = searchParams.get('minQty');
       if (minQtyParam) {
@@ -491,7 +497,7 @@ const StockManagement = () => {
           setMinQuantity(minQty);
         }
       }
-      
+
       const maxQtyParam = searchParams.get('maxQty');
       if (maxQtyParam) {
         const maxQty = parseInt(maxQtyParam, 10);
@@ -499,7 +505,7 @@ const StockManagement = () => {
           setMaxQuantity(maxQty);
         }
       }
-      
+
       // Set filter type to advanced
       setFilterType('advanced');
     }
@@ -564,11 +570,11 @@ const StockManagement = () => {
                 toast.error("No data to export");
                 return;
               }
-              
+
               // Create headers
               const headers = ['ID', 'Product ID', 'Product Name', 'Warehouse ID', 'Warehouse Code', 'Unit', 'Quantity'];
               const csvRows = [headers.join(',')];
-              
+
               // Create rows
               filteredStocks.forEach(stock => {
                 const row = [
@@ -582,10 +588,10 @@ const StockManagement = () => {
                 ];
                 csvRows.push(row.join(','));
               });
-              
+
               // Generate CSV
               const csvContent = csvRows.join('\n');
-              
+
               // Create download
               const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
@@ -596,14 +602,14 @@ const StockManagement = () => {
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
-              
+
               toast.success("Stock data exported to CSV");
             }}>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
-            
-            <Dialog>
+
+            <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
                   <Filter className="h-4 w-4" />
@@ -634,7 +640,7 @@ const StockManagement = () => {
                     isLoading={isApplyingAdvancedFilter}
                     onClearFilters={handleClearFilters}
                   />
-                  
+
                   {/* Low stock threshold functionality */}
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <h4 className="text-sm font-medium mb-2">Low Stock Threshold</h4>
@@ -673,7 +679,7 @@ const StockManagement = () => {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="pt-4 border-t">
                     <Button 
                       variant="default" 
@@ -715,7 +721,7 @@ const StockManagement = () => {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card 
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => navigate('/stock/low-stock')}
@@ -747,7 +753,7 @@ const StockManagement = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
@@ -761,7 +767,7 @@ const StockManagement = () => {
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Average Quantity</CardTitle>
@@ -908,7 +914,7 @@ const StockManagement = () => {
                 </TableBody>
               </Table>
             </div>
-            
+
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center space-x-2">
                 <p className="text-sm text-muted-foreground">
@@ -932,12 +938,12 @@ const StockManagement = () => {
                   </Select>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4">
                 <p className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </p>
-                
+
                 <div className="flex items-center space-x-1">
                   {/* Previous page button */}
                   <Button 
@@ -950,10 +956,10 @@ const StockManagement = () => {
                     <span className="sr-only">Previous page</span>
                     <span>‹</span>
                   </Button>
-                  
+
                   {/* Page number buttons */}
                   {generatePaginationItems()}
-                  
+
                   {/* Next page button */}
                   <Button 
                     variant="outline"

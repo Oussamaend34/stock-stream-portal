@@ -16,7 +16,8 @@ import {
   Users,
   Boxes,
   ShoppingCart,
-  ShoppingBag
+  ShoppingBag,
+  MoveHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -39,6 +40,7 @@ const NavBar = () => {
     { name: 'Purchases', path: '/purchases', icon: <ShoppingBag size={20} /> },
     { name: 'Shipments', path: '/shipments', icon: <Truck size={20} /> },
     { name: 'Receptions', path: '/receptions', icon: <PackageOpen size={20} /> },
+    { name: 'Transfers', path: '/transfers', icon: <MoveHorizontal size={20} /> },
   ];
 
   const toggleMenu = () => {
