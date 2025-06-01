@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +9,15 @@ import { useQuery } from '@tanstack/react-query';
 import { warehouseApi, unitApi, productApi, Product, ShipmentCreationRequest } from '@/lib/api';
 import { Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
+import { TransactionDetailsDTO } from '@/types/transactionDetailsDTO';
 
 // Interface for the form data
 export interface ShipmentFormData extends ShipmentCreationRequest {
   id?: number;
   // Additional fields for UI display
   productName?: string;
+  unitName?: string;
+  orderId?: number | null;
 }
 
 interface ShipmentFormProps {
@@ -25,6 +27,8 @@ interface ShipmentFormProps {
   shipment?: ShipmentFormData;
   mode: 'create' | 'edit';
   isLoading?: boolean;
+  orderId?: number | null;
+  item?: TransactionDetailsDTO | null;
 }
 
 const ShipmentForm = ({ 
@@ -33,24 +37,22 @@ const ShipmentForm = ({
   onSubmit, 
   shipment, 
   mode, 
-  isLoading = false
+  isLoading = false,
+  orderId = null,
+  item = null
 }: ShipmentFormProps) => {
-  // Initialize form data with default values
+  // Initialize form data with both product and unit details
   const [formData, setFormData] = useState<ShipmentFormData>({
     shipmentDate: format(new Date(), 'yyyy-MM-dd'),
-    productId: 0,
-    productName: '',
-    unitId: 0,
+    productId: item?.productId || 0,
+    productName: item?.productName || '',
+    unitId: item?.unitId || 0,
+    unitName: item?.unit || '',
     warehouseId: 0,
     quantity: 1,
     remarks: '',
+    orderId: orderId,
   });
-
-  // State for product search
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // State for form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -65,34 +67,24 @@ const ShipmentForm = ({
     refetchOnWindowFocus: false
   });
 
-  // Fetch units
-  const { data: units, isLoading: isLoadingUnits } = useQuery({
-    queryKey: ['units'],
-    queryFn: async () => {
-      const response = await unitApi.getAll();
-      return response.data;
-    },
-    refetchOnWindowFocus: false
-  });
-
   // Initialize form with shipment data when editing
   useEffect(() => {
     if (shipment && mode === 'edit') {
       setFormData(shipment);
     } else {
-      // Reset form for create mode
       setFormData({
         shipmentDate: format(new Date(), 'yyyy-MM-dd'),
-        productId: 0,
-        productName: '',
-        unitId: 0,
+        productId: item?.productId || 0,
+        productName: item?.productName || '',
+        unitId: item?.unitId || 0,
+        unitName: item?.unit || '',
         warehouseId: 0,
         quantity: 1,
         remarks: '',
+        orderId: orderId,
       });
     }
-  }, [shipment, mode, open]);
-
+  }, [shipment, mode, open, orderId, item]);
 
   // Set default warehouseId when warehouses are loaded
   useEffect(() => {
@@ -104,35 +96,6 @@ const ShipmentForm = ({
       }));
     }
   }, [warehouses, formData.warehouseId]);
-
-  // Handle product search
-  const handleProductSearch = (term: string) => {
-    setSearchTerm(term);
-
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (term.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    // Set a timeout to avoid too many API calls
-    searchTimeoutRef.current = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const response = await productApi.search(term);
-        setSearchResults(response.data.items);
-      } catch (error) {
-        console.error('Error searching products:', error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-  };
 
   // Handle form field changes
   const handleChange = (field: keyof ShipmentFormData, value: string | number) => {
@@ -147,17 +110,6 @@ const ShipmentForm = ({
     }
   };
 
-  // Handle product selection
-  const handleProductSelect = (product: Product) => {
-    setFormData((prev) => ({
-      ...prev,
-      productId: product.id,
-      productName: product.name
-    }));
-    setSearchResults([]);
-    setSearchTerm('');
-  };
-
   // Validate form before submission
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -168,10 +120,6 @@ const ShipmentForm = ({
 
     if (!formData.productId || formData.productId <= 0) {
       newErrors.productId = 'Product is required';
-    }
-
-    if (!formData.unitId || formData.unitId <= 0) {
-      newErrors.unitId = 'Unit is required';
     }
 
     if (!formData.warehouseId || formData.warehouseId <= 0) {
@@ -191,15 +139,14 @@ const ShipmentForm = ({
     e.preventDefault();
 
     if (validateForm()) {
-      // Create a copy of formData without UI-specific fields
       const submitData: ShipmentCreationRequest = {
         shipmentDate: formData.shipmentDate,
-        productId: formData.productId,
-        unitId: formData.unitId,
+        productId: item?.productId || 0,  // Use correct product ID
+        unitId: item?.unitId || 0,        // Use correct unit ID
         warehouseId: formData.warehouseId,
         quantity: formData.quantity,
         remarks: formData.remarks,
-        orderId: null // Always send null for orderId
+        orderId: formData.orderId
       };
 
       onSubmit(submitData);
@@ -231,98 +178,26 @@ const ShipmentForm = ({
             )}
           </div>
 
-          {/* Product Search */}
+          {/* Product Name - Read Only */}
           <div className="space-y-2">
             <Label htmlFor="product">Product</Label>
-            <div className="relative">
-              <div className="flex items-center">
-                <Input
-                  id="product"
-                  value={searchTerm}
-                  onChange={(e) => handleProductSearch(e.target.value)}
-                  placeholder="Search for a product"
-                  className={errors.productId ? 'border-red-500 pr-10' : 'pr-10'}
-                />
-                {isSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin absolute right-3" />
-                ) : (
-                  <Search className="h-4 w-4 absolute right-3 text-gray-400" />
-                )}
-              </div>
-
-              {/* Selected product display */}
-              {formData.productId > 0 && formData.productName && (
-                <div className="mt-2 p-2 bg-blue-50 rounded-md flex justify-between items-center">
-                  <span className="text-sm font-medium">{formData.productName}</span>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        productId: 0,
-                        productName: ''
-                      }));
-                    }}
-                  >
-                    ×
-                  </Button>
-                </div>
-              )}
-
-              {/* Search results dropdown */}
-              {searchResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
-                  <ul className="py-1">
-                    {searchResults.map(product => (
-                      <li 
-                        key={product.id}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                        onClick={() => handleProductSelect(product)}
-                      >
-                        {product.name}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-            {errors.productId && (
-              <p className="text-xs text-red-500">{errors.productId}</p>
-            )}
+            <Input
+              id="product"
+              value={formData.productName}
+              readOnly
+              className="bg-gray-50"
+            />
           </div>
 
-          {/* Unit Selection */}
+          {/* Unit - Read Only - Replace the existing unit select with this */}
           <div className="space-y-2">
-            <Label htmlFor="unitId">Unit</Label>
-            {isLoadingUnits ? (
-              <div className="flex items-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm text-gray-500">Loading units...</span>
-              </div>
-            ) : units && units.length > 0 ? (
-              <Select
-                value={formData.unitId.toString()}
-                onValueChange={(value) => handleChange('unitId', parseInt(value))}
-              >
-                <SelectTrigger className={errors.unitId ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select a unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((unit) => (
-                    <SelectItem key={unit.id} value={unit.id.toString()}>
-                      {unit.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="text-sm text-gray-500">No units available</div>
-            )}
-            {errors.unitId && (
-              <p className="text-xs text-red-500">{errors.unitId}</p>
-            )}
+            <Label htmlFor="unit">Unit</Label>
+            <Input
+              id="unit"
+              value={formData.unitName}
+              readOnly
+              className="bg-gray-50"
+            />
           </div>
 
           {/* Warehouse Selection */}
@@ -385,7 +260,6 @@ const ShipmentForm = ({
               className="resize-none"
             />
           </div>
-
 
           <DialogFooter className="sm:justify-end">
             <Button 

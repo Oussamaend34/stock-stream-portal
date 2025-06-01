@@ -16,6 +16,7 @@ import StockManagement from "./pages/StockManagement";
 import ProductManagement from "./pages/ProductManagement";
 import TransferManagement from "./pages/TransferManagement";
 import NotFound from "./pages/NotFound";
+import InventoryManagement from '@/pages/InventoryManagement';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
           <Route path="/products" element={<Layout><ProductManagement /></Layout>} />
           <Route path="/clients" element={<Layout><ClientManagement /></Layout>} />
           <Route path="/suppliers" element={<Layout><SupplierManagement /></Layout>} />
+          <Route path="/inventories" element={<Layout><InventoryManagement /></Layout>} />
           <Route path="*" element={<Layout><NotFound /></Layout>} />
         </Routes>
       </BrowserRouter>

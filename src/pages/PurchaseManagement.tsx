@@ -60,6 +60,8 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import ReceptionForm from '@/components/ReceptionForm';
+import { receptionApi, ReceptionCreationRequest } from '@/lib/api';
 
 const PurchaseManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +73,10 @@ const PurchaseManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPurchaseFormOpen, setIsPurchaseFormOpen] = useState(false);
   const [isCreatingPurchase, setIsCreatingPurchase] = useState(false);
+  const [isReceptionFormOpen, setIsReceptionFormOpen] = useState(false);
+  const [isCreatingReception, setIsCreatingReception] = useState(false);
+  const [selectedPurchaseItem, setSelectedPurchaseItem] = useState<TransactionDetailsDTO | null>(null);
+  const [receptionFormData, setReceptionFormData] = useState<ReceptionCreationRequest | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -343,6 +349,40 @@ const PurchaseManagement = () => {
       toast.error('Failed to create purchase. Please try again.');
     } finally {
       setIsCreatingPurchase(false);
+    }
+  };
+
+  // Add a function to handle reception button click
+  const handleReceiveClick = (item: TransactionDetailsDTO, purchase: PurchaseDTO) => {
+    // Update the item with purchase information
+    const itemWithPurchase = {
+      ...item,
+      purchaseId: purchase.id,
+      purchaseReference: purchase.purchaseReference,
+      supplierName: purchase.supplierName
+    };
+    setSelectedPurchaseItem(itemWithPurchase);
+    setIsReceptionFormOpen(true);
+  };
+
+  const handleCreateReception = async (receptionData: ReceptionCreationRequest) => {
+    try {
+      setIsCreatingReception(true);
+      await receptionApi.create(receptionData);
+      toast.success('Reception created successfully');
+      setIsReceptionFormOpen(false);
+      setSelectedPurchaseItem(null);
+      
+      queryClient.invalidateQueries(['purchases']);
+      
+      if (selectedPurchaseId) {
+        queryClient.invalidateQueries(['purchase', selectedPurchaseId]);
+      }
+    } catch (error) {
+      console.error('Error creating reception:', error);
+      toast.error('Failed to create reception: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsCreatingReception(false);
     }
   };
 
@@ -643,6 +683,15 @@ const PurchaseManagement = () => {
                           </TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{item.unit}</TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleReceiveClick(item, selectedPurchaseDetails)}
+                            >
+                              Receive
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
@@ -673,6 +722,21 @@ const PurchaseManagement = () => {
         onSubmit={handleCreatePurchase}
         isLoading={isCreatingPurchase}
       />
+
+      {/* Reception Form */}
+      {isReceptionFormOpen && selectedPurchaseItem && (
+        <ReceptionForm
+          open={isReceptionFormOpen}
+          onOpenChange={setIsReceptionFormOpen}
+          onSubmit={handleCreateReception}
+          mode="fromPurchase"
+          isLoading={isCreatingReception}
+          purchaseId={selectedPurchaseItem?.purchaseId}
+          item={selectedPurchaseItem}
+          purchaseReference={selectedPurchaseItem?.purchaseReference}
+          supplierName={selectedPurchaseItem?.supplierName}
+        />
+      )}
     </>
   );
 };

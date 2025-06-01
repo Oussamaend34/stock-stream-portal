@@ -31,6 +31,7 @@ import {
   Plus
 } from 'lucide-react';
 import OrderForm from '@/components/OrderForm';
+import ShipmentForm from '@/components/ShipmentForm';
 import { toast } from 'sonner';
 import {
   Pagination,
@@ -42,7 +43,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { orderApi, clientApi, OrderCreationRequest } from '@/lib/api';
+import { orderApi, clientApi, OrderCreationRequest, shipmentApi, ShipmentCreationRequest } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import {
   Select,
@@ -74,7 +75,9 @@ import {
 // Define the order data structure based on the DTO
 interface TransactionDetailsDTO {
   id: number;
+  productId: number;
   productName: string;
+  unitId: number;
   unit: string;
   quantity: number;
 }
@@ -124,6 +127,9 @@ const OrderManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [isShipmentFormOpen, setIsShipmentFormOpen] = useState(false);
+  const [isCreatingShipment, setIsCreatingShipment] = useState(false);
+  const [selectedOrderItem, setSelectedOrderItem] = useState<TransactionDetailsDTO | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -420,6 +426,28 @@ const OrderManagement = () => {
     toast.success('Order list has been refreshed with new data');
   };
 
+  // Handle shipment creation
+  const handleCreateShipment = async (shipmentData: ShipmentCreationRequest) => {
+    setIsCreatingShipment(true);
+    try {
+      await shipmentApi.create(shipmentData);
+      toast.success('Shipment created successfully');
+      setIsShipmentFormOpen(false);
+      setSelectedOrderItem(null);
+    } catch (error) {
+      console.error('Error creating shipment:', error);
+      toast.error('Failed to create shipment. Please try again.');
+    } finally {
+      setIsCreatingShipment(false);
+    }
+  };
+
+  // Handle ship item button click
+  const handleShipItem = (item: TransactionDetailsDTO) => {
+    setSelectedOrderItem(item);
+    setIsShipmentFormOpen(true);
+  };
+
   // Main orders listing view
   return (
     <>
@@ -705,6 +733,7 @@ const OrderManagement = () => {
                       <TableHead>Product</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Unit</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -717,11 +746,22 @@ const OrderManagement = () => {
                           </TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{item.unit}</TableCell>
+                          <TableCell>
+                            <Button 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent dialog from closing
+                                handleShipItem(item);
+                              }}
+                            >
+                              SHIP
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
+                        <TableCell colSpan={5} className="h-24 text-center">
                           No items found for this order.
                         </TableCell>
                       </TableRow>
@@ -747,8 +787,22 @@ const OrderManagement = () => {
         onSubmit={handleCreateOrder}
         isLoading={isCreatingOrder}
       />
+
+      {/* Shipment Form Dialog */}
+      {selectedOrderItem && (
+        <ShipmentForm
+          open={isShipmentFormOpen}
+          onOpenChange={setIsShipmentFormOpen}
+          onSubmit={handleCreateShipment}
+          mode="create"
+          isLoading={isCreatingShipment}
+          orderId={selectedOrderId}
+          item={selectedOrderItem}
+        />
+      )}
     </>
   );
 };
 
 export default OrderManagement;
+

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,8 @@ import {
   Boxes,
   ShoppingCart,
   ShoppingBag,
-  MoveHorizontal
+  MoveHorizontal,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -36,6 +36,7 @@ const NavBar = () => {
     { name: 'Warehouses', path: '/warehouses', icon: <Warehouse size={20} /> },
     { name: 'Stock', path: '/stock', icon: <Boxes size={20} /> },
     { name: 'Products', path: '/products', icon: <Package size={20} /> },
+    { name: 'Inventory', path: '/inventories', icon: <ClipboardList size={20} /> },
     { name: 'Orders', path: '/orders', icon: <ShoppingCart size={20} /> },
     { name: 'Purchases', path: '/purchases', icon: <ShoppingBag size={20} /> },
     { name: 'Shipments', path: '/shipments', icon: <Truck size={20} /> },

@@ -6,15 +6,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useQuery } from '@tanstack/react-query';
-import { warehouseApi, unitApi, productApi, purchaseApi, Product, ReceptionCreationRequest, PurchaseDTO } from '@/lib/api';
+import { warehouseApi, unitApi, productApi, purchaseApi, Product, ReceptionCreationRequest, PurchaseDTO, TransactionDetailsDTO } from '@/lib/api';
 import { Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Interface for the form data
-export interface ReceptionFormData extends ReceptionCreationRequest {
+interface ReceptionFormData extends ReceptionCreationRequest {
   id?: number;
   // Additional fields for UI display
   productName?: string;
+  unitName?: string;
+  purchaseId?: number | null;
+  purchaseReference?: string;
+  supplierName?: string;
 }
 
 interface ReceptionFormProps {
@@ -22,28 +26,39 @@ interface ReceptionFormProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (reception: ReceptionCreationRequest) => void;
   reception?: ReceptionFormData;
-  mode: 'create' | 'edit';
+  mode: 'create' | 'edit' | 'fromPurchase';
   isLoading?: boolean;
+  purchaseId?: number | null;
+  item?: TransactionDetailsDTO | null;
+  purchaseReference?: string;
+  supplierName?: string;
 }
 
-const ReceptionForm = ({ 
-  open, 
-  onOpenChange, 
-  onSubmit, 
-  reception, 
-  mode, 
-  isLoading = false
+const ReceptionForm = ({
+  open,
+  onOpenChange,
+  onSubmit,
+  reception,
+  mode,
+  isLoading = false,
+  purchaseId = null,
+  item = null,
+  purchaseReference = '',
+  supplierName = ''
 }: ReceptionFormProps) => {
-  // Initialize form data with default values
-  const [formData, setFormData] = useState<ReceptionFormData>({
+  const [formData, setFormData] = useState<ReceptionFormData>(() => ({
     receptionDate: format(new Date(), 'yyyy-MM-dd'),
-    productId: 0,
-    productName: '',
-    unitId: 0,
+    productId: item?.productId || 0,
+    productName: item?.productName || '',
+    unitId: item?.unitId || 0,
+    unitName: item?.unit || '',
     warehouseId: 0,
-    quantity: 1,
+    quantity: item?.quantity || 1,
     remarks: '',
-  });
+    purchaseId: purchaseId,
+    purchaseReference: purchaseReference,
+    supplierName: supplierName
+  }));
 
   // State for product search
   const [productSearchTerm, setProductSearchTerm] = useState('');
@@ -90,6 +105,7 @@ const ReceptionForm = ({
         warehouseId: 0,
         quantity: 1,
         remarks: '',
+        purchaseId: undefined
       });
     }
   }, [reception, mode, open]);
@@ -192,20 +208,56 @@ const ReceptionForm = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  // Update the useEffect to handle form reset properly
+  useEffect(() => {
+    if (!open) {
+      // Reset form when dialog closes
+      setFormData({
+        receptionDate: format(new Date(), 'yyyy-MM-dd'),
+        productId: 0,
+        productName: '',
+        unitId: 0,
+        warehouseId: 0,
+        quantity: 1,
+        remarks: '',
+        purchaseId: null,
+        purchaseReference: '',
+        supplierName: ''
+      });
+      setErrors({});
+    } else if (mode === 'fromPurchase' && item) {
+      // Set form data from purchase item
+      setFormData({
+        receptionDate: format(new Date(), 'yyyy-MM-dd'),
+        productId: item.productId,
+        productName: item.productName,
+        unitId: item.unitId,
+        unitName: item.unit,
+        quantity: item.quantity,
+        warehouseId: 0, // Will be set by warehouse useEffect
+        remarks: '',
+        purchaseId: purchaseId,
+        purchaseReference: purchaseReference,
+        supplierName: supplierName
+      });
+    }
+  }, [open, item, mode, purchaseId, purchaseReference, supplierName]);
+
+  // Update the handleSubmit function to prevent double submission
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return;
 
     if (validateForm()) {
-      // Create a copy of formData without UI-specific fields
       const submitData: ReceptionCreationRequest = {
         receptionDate: formData.receptionDate,
         productId: formData.productId,
         unitId: formData.unitId,
         warehouseId: formData.warehouseId,
-        purchaseId: null, // Always send null for purchaseId as per requirements
         quantity: formData.quantity,
         remarks: formData.remarks,
+        purchaseId: mode === 'fromPurchase' ? purchaseId : undefined
       };
 
       onSubmit(submitData);
@@ -217,7 +269,7 @@ const ReceptionForm = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'Create New Reception' : 'Edit Reception'}
+            {mode === 'create' ? 'Create New Reception' : mode === 'fromPurchase' ? 'Create Reception from Purchase' : 'Edit Reception'}
           </DialogTitle>
         </DialogHeader>
 
@@ -237,100 +289,52 @@ const ReceptionForm = ({
             )}
           </div>
 
-          {/* Purchase field removed as per requirements */}
+          {/* Purchase Reference - Show only in fromPurchase mode */}
+          {mode === 'fromPurchase' && (
+            <div className="space-y-2">
+              <Label htmlFor="purchaseReference">Purchase Reference</Label>
+              <Input
+                id="purchaseReference"
+                value={purchaseReference}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+          )}
 
-          {/* Product Search */}
+          {/* Supplier Name - Show only in fromPurchase mode */}
+          {mode === 'fromPurchase' && (
+            <div className="space-y-2">
+              <Label htmlFor="supplierName">Supplier</Label>
+              <Input
+                id="supplierName"
+                value={supplierName}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+          )}
+
+          {/* Product Name - Read Only when from purchase */}
           <div className="space-y-2">
             <Label htmlFor="product">Product</Label>
-            <div className="relative">
-              <div className="flex items-center">
-                <Input
-                  id="product"
-                  value={productSearchTerm}
-                  onChange={(e) => handleProductSearch(e.target.value)}
-                  placeholder="Search for a product"
-                  className={errors.productId ? 'border-red-500 pr-10' : 'pr-10'}
-                />
-                {isProductSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin absolute right-3" />
-                ) : (
-                  <Search className="h-4 w-4 absolute right-3 text-gray-400" />
-                )}
-              </div>
-
-              {/* Selected product display */}
-              {formData.productId > 0 && formData.productName && (
-                <div className="mt-2 p-2 bg-blue-50 rounded-md flex justify-between items-center">
-                  <span className="text-sm font-medium">{formData.productName}</span>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        productId: 0,
-                        productName: ''
-                      }));
-                    }}
-                  >
-                    ×
-                  </Button>
-                </div>
-              )}
-
-              {/* Search results dropdown */}
-              {productSearchResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
-                  <ul className="py-1">
-                    {productSearchResults.map(product => (
-                      <li 
-                        key={product.id}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                        onClick={() => handleProductSelect(product)}
-                      >
-                        {product.name}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-            {errors.productId && (
-              <p className="text-xs text-red-500">{errors.productId}</p>
-            )}
+            <Input
+              id="product"
+              value={formData.productName}
+              readOnly={!!purchaseId}
+              className={purchaseId ? 'bg-gray-50' : ''}
+            />
           </div>
 
-          {/* Unit Selection */}
+          {/* Unit - Read Only when from purchase */}
           <div className="space-y-2">
-            <Label htmlFor="unitId">Unit</Label>
-            {isLoadingUnits ? (
-              <div className="flex items-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm text-gray-500">Loading units...</span>
-              </div>
-            ) : units && units.length > 0 ? (
-              <Select
-                value={formData.unitId.toString()}
-                onValueChange={(value) => handleChange('unitId', parseInt(value))}
-              >
-                <SelectTrigger className={errors.unitId ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select a unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((unit) => (
-                    <SelectItem key={unit.id} value={unit.id.toString()}>
-                      {unit.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="text-sm text-gray-500">No units available</div>
-            )}
-            {errors.unitId && (
-              <p className="text-xs text-red-500">{errors.unitId}</p>
-            )}
+            <Label htmlFor="unit">Unit</Label>
+            <Input
+              id="unit"
+              value={formData.unitName}
+              readOnly={!!purchaseId}
+              className={purchaseId ? 'bg-gray-50' : ''}
+            />
           </div>
 
           {/* Warehouse Selection */}

@@ -469,25 +469,8 @@ const ReceptionManagement = () => {
                             {reception.warehouse}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {reception.purchaseReference ? (
-                            <div className="font-medium text-blue-600 hover:underline">
-                              {reception.purchaseReference}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">N/A</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {reception.supplierName ? (
-                            <div className="flex items-center">
-                              <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {reception.supplierName}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">N/A</span>
-                          )}
-                        </TableCell>
+                        <TableCell>{reception.purchaseReference || '-'}</TableCell>
+                        <TableCell>{reception.supplierName || '-'}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -593,12 +576,13 @@ const ReceptionManagement = () => {
         </Card>
       </div>
 
-      <ReceptionForm 
-        open={formOpen} 
-        onOpenChange={setFormOpen} 
-        onSubmit={handleFormSubmit} 
+      <ReceptionForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={handleFormSubmit}
         reception={currentReception}
         mode={formMode}
+        formType="normal"
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

@@ -88,9 +88,12 @@ export const orderApi = {
 // Purchase API types
 export interface TransactionDetailsDTO {
   id: number;
+  productId: number;
   productName: string;
+  unitId: number;
   unit: string;
   quantity: number;
+  purchaseId: number;
 }
 
 export interface PurchaseDTO {
@@ -428,3 +431,129 @@ export const transferApi = {
 };
 
 export default api;
+
+// Add these to your existing api.ts file
+
+export interface InventoryCreationRequest {
+  InventoryDate: string;
+  warehouse: string;
+  file: any;
+}
+
+// Add this interface to match the backend response
+export interface InventoryCreationResponse {
+  inventory: {
+    id: number;
+    inventoryDate: string;
+    warehouse: string;
+    doneBy: {
+      id: number;
+      email: string;
+      name: string;
+      phone: string;
+      address: string;
+      cin: string;
+      role: string;
+    };
+    validatedBy: null | any;
+    createdAt: string;
+    status: string;
+  };
+  file: any;
+}
+
+export interface InventoryDTO {
+  id: number;
+  inventoryDate: string;
+  warehouse: string;
+  doneBy: {
+    id: number;
+    name: string;
+  };
+  validatedBy: {
+    id: number;
+    name: string;
+  } | null;
+  status: 'CREATED' | 'VALIDATED' | 'CANCELLED';
+  createdAt: string;
+}
+
+export interface InventoryLineDTO {
+  productId: number;
+  productName: string;
+  unitId: number;
+  unitName: string;
+  expectedQuantity: number;
+  actualQuantity: number;
+  difference: number;
+}
+
+// Single definition of inventoryApi with all methods
+export const inventoryApi = {
+  // Get all inventories with pagination
+  getAll: (page = 1, size = 10) => {
+    return api.get('/inventorys/getAllInventories', {
+      params: { page, size },
+      timeout: 10000
+    });
+  },
+
+  // Get inventory by ID
+  getById: (id: number) => api.get(`/inventorys/${id}`),
+
+  // Create new inventory
+  create: (data: InventoryCreationRequest) => {
+    return api.post('/inventorys/create', data, {
+      responseType: 'arraybuffer',
+      headers: {
+        'Accept': 'application/octet-stream'
+      }
+    });
+  },
+
+  // Process file for an inventory
+  processFile: async (inventoryId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await api.post(`/inventorys/uploadFile/${inventoryId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
+  },
+
+  // Validate inventory
+  validate: (id: number) => api.put(`/inventorys/validateInventory/${id}`),
+
+  // Get inventory lines
+  getLines: (id: number) => api.get(`/inventorys/${id}/lines`),
+
+  // Delete inventory
+  delete: (id: number) => api.delete(`/inventorys/deleteInventory/${id}`),
+
+  uploadFile: async (inventoryId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file); // Make sure the parameter name matches backend (@RequestParam("file"))
+    
+    try {
+      const response = await api.post(`/inventorys/uploadFile/${inventoryId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
+  },
+};
+
+
