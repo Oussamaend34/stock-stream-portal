@@ -6,10 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useQuery } from '@tanstack/react-query';
-import { warehouseApi, unitApi, productApi, Product, ShipmentCreationRequest } from '@/lib/api';
+import { warehouseApi, unitApi, productApi, Product, ShipmentCreationRequest, TransactionDetailsDTO } from '@/lib/api';
 import { Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { TransactionDetailsDTO } from '@/types/transactionDetailsDTO';
 
 // Interface for the form data
 export interface ShipmentFormData extends ShipmentCreationRequest {
@@ -178,6 +177,18 @@ const ShipmentForm = ({
     }, 200);
   };
 
+  // Handle clearing selected product
+  const handleClearProduct = () => {
+    setFormData(prev => ({
+      ...prev,
+      productId: 0,
+      productName: '',
+      unitId: 0,
+      unitName: ''
+    }));
+    setProductSearchTerm('');
+  };
+
   // Validate form before submission
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -308,9 +319,18 @@ const ShipmentForm = ({
               <p className="text-xs text-red-500">{errors.productId}</p>
             )}
             {formData.productId > 0 && (
-              <p className="text-sm text-gray-500">
-                Selected: {formData.productName}
-              </p>
+              <div className="mt-2 p-2 bg-blue-50 rounded-md flex justify-between items-center">
+                <span className="text-sm font-medium">{formData.productName}</span>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={handleClearProduct}
+                  className="h-8 w-8 p-0"
+                >
+                  ×
+                </Button>
+              </div>
             )}
           </div>
 

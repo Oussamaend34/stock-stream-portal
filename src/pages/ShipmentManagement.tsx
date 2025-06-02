@@ -328,11 +328,18 @@ const ShipmentManagement = () => {
     if (formMode === 'create') {
       createShipmentMutation.mutate(shipment, {
         onSuccess: () => {
-          toast.success(`Shipment has been created successfully`);
+          toast.success('Shipment has been created successfully');
           setFormOpen(false);
         },
-        onError: (error) => {
-          toast.error(`Failed to create shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        onError: (error: any) => {
+          // Check if it's an insufficient stock error (409)
+          if (error.response?.status === 409) {
+            const productName = currentShipment?.productName || 'selected product';
+            const quantity = shipment.quantity;
+            toast.error(`⚠️ Insufficient Stock: Unable to create shipment for ${quantity} units of ${productName}. Please check the available stock in the selected warehouse and try again with a lower quantity.`);
+          } else {
+            toast.error(`❌ Failed to create shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }
       });
     }
