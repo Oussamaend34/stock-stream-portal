@@ -1,0 +1,49 @@
+I want to add a new section to manage Receptions this section is similar to the shipments section the difference is the endpoint prefix /api/v1/receptions and the receptions work with purchases and suppliers instead of orders and clients
+when returning all the receptions we return it like this
+@GetMapping
+    public ResponseEntity<Container<ReceptionDTO>> getAllReceptions(
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
+        log.info("Got request to fetch all receptions");
+        Container<ReceptionDTO> receptions = receptionService.getAllReceptions(page, size);
+        log.info("Fetched {} receptions", receptions.items().size());
+        return ResponseEntity.ok(receptions);
+    }
+public record Container<T> (
+        Long count,
+        List<T> items
+) {
+}
+public record ReceptionDTO(
+        Long id,
+        LocalDate receptionDate,
+        Integer quantity,
+        String product,
+                String unit,
+                String warehouse,
+                String remarks,
+                String purchaseReference,
+                String supplierName
+        ) {
+        }
+        The request that the reception endpoint accept to create new receptions is
+        @PostMapping
+            public ResponseEntity<ReceptionDTO> createReception(
+                    @Valid @RequestBody ReceptionCreationRequest request
+            ) {
+                log.info("Got request to create a new reception for product ID {} from warehouse with ID: {}", request.productId(), request.warehouseId());
+                ReceptionDTO receptionDTO = receptionService.createReception(request);
+                log.info("Reception created successfully for product ID {} from warehouse with ID: {}", request.productId(), request.warehouseId());
+                return ResponseEntity.status(HttpStatus.CREATED).body(receptionDTO);
+            }
+        public record ReceptionCreationRequest(
+                LocalDate receptionDate,
+                Long productId,
+                        Long unitId,
+                        Long warehouseId,
+                        Long purchaseId,
+                        String remarks,
+                        Integer quantity
+                ) {
+                }

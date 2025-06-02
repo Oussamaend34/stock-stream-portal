@@ -1,6 +1,7 @@
 import axios from 'axios';
+import axiosInstance from './axios';
 
-// Define the base URL for the API
+// Define the base URL for the API - this is now just for reference since it's configured in axiosInstance
 const API_BASE_URL = 'http://localhost:8080/api/v1';
 
 // Create an axios instance with default config
@@ -29,30 +30,29 @@ export const userApi = {
     // UI uses 0-based index internally, but API needs 1-based
     const apiPage = page + 1;
     console.log(`API call: users?page=${apiPage}&size=${size}`);
-    return api.get(`/users`, { 
+    return axiosInstance.get(`/users`, { 
       params: { page: apiPage, size },
-      // Add timeout to prevent hanging requests
       timeout: 10000
     });
   },
 
   // New method to get the total count of users for pagination
   getTotalCount: () => {
-    return api.get('/users/count');
+    return axiosInstance.get('/users/count');
   },
-  getById: (id: number) => api.get(`/users/${id}`),
-  create: (userData: any) => api.post('/users', userData),
-  update: (id: number, userData: any) => api.put(`/users/${id}`, userData),
-  delete: (id: number) => api.delete(`/users/${id}`),
+  getById: (id: number) => axiosInstance.get(`/users/${id}`),
+  create: (userData: any) => axiosInstance.post('/users', userData),
+  update: (id: number, userData: any) => axiosInstance.put(`/users/${id}`, userData),
+  delete: (id: number) => axiosInstance.delete(`/users/${id}`),
 };
 
 // Warehouse API endpoints
 export const warehouseApi = {
-  getAll: () => api.get('/warehouses'),
-  getById: (id: number) => api.get(`/warehouses/${id}`),
-  create: (warehouseData: any) => api.post('/warehouses', warehouseData),
-  update: (id: number, warehouseData: any) => api.put(`/warehouses/${id}`, warehouseData),
-  delete: (id: number) => api.delete(`/warehouses/${id}`),
+  getAll: () => axiosInstance.get('/warehouses'),
+  getById: (id: number) => axiosInstance.get(`/warehouses/${id}`),
+  create: (warehouseData: any) => axiosInstance.post('/warehouses', warehouseData),
+  update: (id: number, warehouseData: any) => axiosInstance.put(`/warehouses/${id}`, warehouseData),
+  delete: (id: number) => axiosInstance.delete(`/warehouses/${id}`),
 };
 
 // Order API types
@@ -71,18 +71,13 @@ export interface OrderCreationRequest {
 
 // Order API endpoints
 export const orderApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/orders', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/orders/${id}`),
-  create: (orderData: OrderCreationRequest) => api.post('/orders', orderData),
-  update: (id: number, orderData: any) => api.put(`/orders/${id}`, orderData),
-  delete: (id: number) => api.delete(`/orders/${id}`),
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/orders?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/orders/${id}`),
+  create: (orderData: OrderCreationRequest) => axiosInstance.post('/orders', orderData),
+  update: (id: number, orderData: any) => axiosInstance.put(`/orders/${id}`, orderData),
+  delete: (id: number) => axiosInstance.delete(`/orders/${id}`),
   // Get total count of orders
-  getTotalCount: () => api.get('/orders/count'),
+  getTotalCount: () => axiosInstance.get('/orders/count'),
 };
 
 // Purchase API types
@@ -127,18 +122,13 @@ export type PurchasesContainer = Container<PurchaseDTO>;
 
 // Purchase API endpoints
 export const purchaseApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/purchases', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/purchases/${id}`),
-  create: (purchaseData: PurchaseCreationRequest) => api.post('/purchases', purchaseData),
-  update: (id: number, purchaseData: any) => api.put(`/purchases/${id}`, purchaseData),
-  delete: (id: number) => api.delete(`/purchases/${id}`),
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/purchases?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/purchases/${id}`),
+  create: (purchaseData: PurchaseCreationRequest) => axiosInstance.post('/purchases', purchaseData),
+  update: (id: number, purchaseData: any) => axiosInstance.put(`/purchases/${id}`, purchaseData),
+  delete: (id: number) => axiosInstance.delete(`/purchases/${id}`),
   // Get total count of purchases
-  getTotalCount: () => api.get('/purchases/count'),
+  getTotalCount: () => axiosInstance.get('/purchases/count'),
 };
 
 // Shipment API types
@@ -160,7 +150,7 @@ export interface ShipmentCreationRequest {
   productId: number;
   unitId: number;
   warehouseId: number;
-  orderId?: number; // Optional as per requirements
+  orderId?: number | null; // Optional as per requirements
   remarks: string;
   quantity: number;
 }
@@ -170,16 +160,11 @@ export type ShipmentsContainer = Container<ShipmentDTO>;
 
 // Shipment API endpoints
 export const shipmentApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/shipments', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/shipments/${id}`),
-  create: (shipmentData: ShipmentCreationRequest) => api.post('/shipments', shipmentData),
-  update: (id: number, shipmentData: any) => api.put(`/shipments/${id}`, shipmentData),
-  delete: (id: number) => api.delete(`/shipments/${id}`),
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/shipments?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/shipments/${id}`),
+  create: (shipmentData: ShipmentCreationRequest) => axiosInstance.post('/shipments', shipmentData),
+  update: (id: number, shipmentData: any) => axiosInstance.put(`/shipments/${id}`, shipmentData),
+  delete: (id: number) => axiosInstance.delete(`/shipments/${id}`),
 };
 
 // Reception API types
@@ -211,16 +196,11 @@ export type ReceptionsContainer = Container<ReceptionDTO>;
 
 // Reception API endpoints
 export const receptionApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/receptions', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/receptions/${id}`),
-  create: (receptionData: ReceptionCreationRequest) => api.post('/receptions', receptionData),
-  update: (id: number, receptionData: any) => api.put(`/receptions/${id}`, receptionData),
-  delete: (id: number) => api.delete(`/receptions/${id}`),
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/receptions?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/receptions/${id}`),
+  create: (receptionData: ReceptionCreationRequest) => axiosInstance.post('/receptions', receptionData),
+  update: (id: number, receptionData: any) => axiosInstance.put(`/receptions/${id}`, receptionData),
+  delete: (id: number) => axiosInstance.delete(`/receptions/${id}`),
 };
 
 // Client API types
@@ -231,22 +211,15 @@ export type ClientsContainer = Container<Client>;
 
 // Client API endpoints
 export const clientApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/clients', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/clients/${id}`),
-  create: (clientData: any) => api.post('/clients', clientData),
-  update: (id: number, clientData: any) => api.put(`/clients/${id}`, clientData),
-  delete: (id: number) => api.delete(`/clients/${id}`),
-  search: (name: string, page = 1, size = 3) => {
-    return api.get('/clients/search', {
-      params: { name, page, size },
-      timeout: 10000
-    });
-  },
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/clients?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/clients/${id}`),
+  create: (clientData: any) => axiosInstance.post('/clients', clientData),
+  update: (id: number, clientData: any) => axiosInstance.put(`/clients/${id}`, clientData),
+  delete: (id: number) => axiosInstance.delete(`/clients/${id}`),
+  search: (name: string, page = 1, size = 3) => axiosInstance.get('/clients/search', {
+    params: { name, page, size },
+    timeout: 10000
+  }),
 };
 
 // Supplier API types
@@ -257,31 +230,46 @@ export type SuppliersContainer = Container<Supplier>;
 
 // Supplier API endpoints
 export const supplierApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/suppliers', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/suppliers/${id}`),
-  create: (supplierData: any) => api.post('/suppliers', supplierData),
-  update: (id: number, supplierData: any) => api.put(`/suppliers/${id}`, supplierData),
-  delete: (id: number) => api.delete(`/suppliers/${id}`),
-  search: (name: string, page = 1, size = 3) => {
-    return api.get('/suppliers/search', {
-      params: { name, page, size },
-      timeout: 10000
-    });
-  },
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/suppliers?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/suppliers/${id}`),
+  create: (supplierData: any) => axiosInstance.post('/suppliers', supplierData),
+  update: (id: number, supplierData: any) => axiosInstance.put(`/suppliers/${id}`, supplierData),
+  delete: (id: number) => axiosInstance.delete(`/suppliers/${id}`),
+  search: (name: string, page = 1, size = 3) => axiosInstance.get('/suppliers/search', {
+    params: { name, page, size },
+    timeout: 10000
+  }),
 };
+
+// Unit API types
+export interface Unit {
+  id: number;
+  name: string;
+  abbreviation: string;
+}
 
 // Unit API endpoints
 export const unitApi = {
-  getAll: () => api.get('/units'),
-  getById: (id: number) => api.get(`/units/${id}`),
-  create: (unitData: { unit: string, abbreviation: string }) => api.post('/units', unitData),
-  update: (id: number, unitData: { unit: string, abbreviation: string }) => api.put(`/units/${id}`, unitData),
-  delete: (id: number) => api.delete(`/units/${id}`),
+  getAll: async () => {
+    const response = await axiosInstance.get<Unit[]>('/units');
+    return response;
+  },
+
+  create: async (name: string, abbreviation: string) => {
+    const params = new URLSearchParams();
+    params.append('unit', name);
+    params.append('abbreviation', abbreviation);
+    const response = await axiosInstance.post<Unit>('/units', null, { params });
+    return response;
+  },
+
+  update: async (id: number, name: string, abbreviation: string) => {
+    const params = new URLSearchParams();
+    params.append('unit', name);
+    params.append('abbreviation', abbreviation);
+    const response = await axiosInstance.put<Unit>(`/units/${id}`, null, { params });
+    return response;
+  }
 };
 
 // Stock API types
@@ -294,66 +282,24 @@ export interface StockFilterRequest {
 
 // Stock API endpoints
 export const stockApi = {
-  // Get all stocks with pagination
-  getAll: (page = 1, size = 10) => {
-    // API already expects 1-based pagination
-    return api.get('/stocks', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  // Get stocks by warehouse ID with pagination
-  getByWarehouse: (warehouseId: number, page = 1, size = 10) => {
-    // API already expects 1-based pagination
-    return api.get('/stocks/by-warehouse', {
-      params: { warehouseId, page, size },
-      timeout: 10000
-    });
-  },
-  // Get stocks by product ID with pagination
-  getByProduct: (productId: number, page = 1, size = 10) => {
-    // API already expects 1-based pagination
-    return api.get('/stocks/by-product', {
-      params: { productId, page, size },
-      timeout: 10000
-    });
-  },
-  // Get low stock count with a threshold
-  getLowStockCount: (threshold = 10) => {
-    return api.get('/stocks/low-stock/count', {
-      params: { threshold },
-      timeout: 5000
-    });
-  },
-  // Get low stock items with pagination and threshold
-  getLowStockItems: (threshold = 10, page = 1, size = 10) => {
-    return api.get('/stocks/low-stock', {
-      params: { threshold, page, size },
-      timeout: 10000
-    });
-  },
-// Advanced filtering with multiple criteria
-  filter: (filterOptions: {
-    productNames?: string[];
-    warehouseIds?: number[];
-    minQuantity?: number;
-    maxQuantity?: number;
-  }, page = 1, size = 10) => {
-    // Create a StockFilterRequest object that matches the backend model
-    const stockFilterRequest: StockFilterRequest = {
-      productNames: filterOptions.productNames?.filter(name => name.trim().length > 0) || [],
-      warehouseIds: filterOptions.warehouseIds?.filter(id => !isNaN(id)) || [],
-      minQuantity: filterOptions.minQuantity !== undefined && !isNaN(filterOptions.minQuantity) ? filterOptions.minQuantity : null,
-      maxQuantity: filterOptions.maxQuantity !== undefined && !isNaN(filterOptions.maxQuantity) ? filterOptions.maxQuantity : null
-    };
-
-    console.log('Sending filter request with options:', stockFilterRequest);
-
-    return api.post('/stocks/filter', stockFilterRequest, {
-      params: { page, size },
-      timeout: 15000  // Increased timeout for complex queries
-    });
-  }
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/stocks?page=${page}&size=${size}`),
+  getByWarehouse: (warehouseId: number, page = 1, size = 10) => axiosInstance.get('/stocks/by-warehouse', {
+    params: { warehouseId, page, size },
+    timeout: 10000
+  }),
+  getByProduct: (productId: number, page = 1, size = 10) => axiosInstance.get('/stocks/by-product', {
+    params: { productId, page, size },
+    timeout: 10000
+  }),
+  getLowStockCount: (threshold = 10) => axiosInstance.get('/stocks/low-stock/count', {
+    params: { threshold },
+    timeout: 5000
+  }),
+  getLowStockItems: (threshold = 10, page = 1, size = 10) => axiosInstance.get('/stocks/low-stock', {
+    params: { threshold, page, size },
+    timeout: 10000
+  }),
+  filter: (filter: StockFilterRequest) => axiosInstance.post('/stocks/filter', filter)
 };
 
 // Product API types
@@ -366,28 +312,17 @@ export interface Product {
 
 // Product API endpoints
 export const productApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/products', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/products/${id}`),
-  search: (name: string, page = 1, size = 3) => {
-    return api.get('/products/search', {
-      params: { name, page, size },
-      timeout: 10000
-    });
-  },
-  create: (productData: { name: string, description: string }) => api.post('/products', null, {
-    params: productData,
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/products?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/products/${id}`),
+  search: (query: string, page = 1, size = 3) => axiosInstance.get('/products/search', {
+    params: { name: query, page, size },
     timeout: 10000
   }),
-  update: (id: number, productData: { name: string, description: string }) => api.put(`/products/${id}`, null, {
-    params: productData,
-    timeout: 10000
+  create: (productData: { name: string, description: string }) => axiosInstance.post('/products', null, {
+    params: productData
   }),
-  delete: (id: number) => api.delete(`/products/${id}`),
+  update: (id: number, productData: { name: string, description: string }) => axiosInstance.put(`/products/${id}`, productData),
+  delete: (id: number) => axiosInstance.delete(`/products/${id}`),
 };
 
 // Transfer API types
@@ -418,16 +353,11 @@ export type TransfersContainer = Container<TransferDTO>;
 
 // Transfer API endpoints
 export const transferApi = {
-  getAll: (page = 1, size = 10) => {
-    return api.get('/transfers', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-  getById: (id: number) => api.get(`/transfers/${id}`),
-  create: (transferData: TransferRequest) => api.post('/transfers', transferData),
-  update: (id: number, transferData: TransferRequest) => api.put(`/transfers/${id}`, transferData),
-  delete: (id: number) => api.delete(`/transfers/${id}`),
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/transfers?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/transfers/${id}`),
+  create: (transferData: TransferRequest) => axiosInstance.post('/transfers', transferData),
+  update: (id: number, transferData: TransferRequest) => axiosInstance.put(`/transfers/${id}`, transferData),
+  delete: (id: number) => axiosInstance.delete(`/transfers/${id}`),
 };
 
 export default api;
@@ -490,70 +420,62 @@ export interface InventoryLineDTO {
 
 // Single definition of inventoryApi with all methods
 export const inventoryApi = {
-  // Get all inventories with pagination
-  getAll: (page = 1, size = 10) => {
-    return api.get('/inventorys/getAllInventories', {
-      params: { page, size },
-      timeout: 10000
-    });
-  },
-
-  // Get inventory by ID
-  getById: (id: number) => api.get(`/inventorys/${id}`),
-
-  // Create new inventory
-  create: (data: InventoryCreationRequest) => {
-    return api.post('/inventorys/create', data, {
-      responseType: 'arraybuffer',
+  getAll: (page = 1, size = 10) => axiosInstance.get(`/inventories?page=${page}&size=${size}`),
+  getById: (id: number) => axiosInstance.get(`/inventories/${id}`),
+  create: (data: InventoryCreationRequest) => axiosInstance.post('/inventories', data, {
+    responseType: 'arraybuffer',
+    headers: {
+      'Accept': 'application/octet-stream'
+    }
+  }),
+  processFile: (inventoryId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosInstance.post(`/inventories/uploadFile/${inventoryId}`, formData, {
       headers: {
-        'Accept': 'application/octet-stream'
+        'Content-Type': 'multipart/form-data',
       }
     });
   },
-
-  // Process file for an inventory
-  processFile: async (inventoryId: number, file: File) => {
+  validate: (id: number) => axiosInstance.put(`/inventories/validateInventory/${id}`),
+  getLines: (id: number) => axiosInstance.get(`/inventories/${id}/lines`),
+  delete: (id: number) => axiosInstance.delete(`/inventories/deleteInventory/${id}`),
+  uploadFile: (inventoryId: number, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    
-    try {
-      const response = await api.post(`/inventorys/uploadFile/${inventoryId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
-    }
+    return axiosInstance.post(`/inventories/uploadFile/${inventoryId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    });
   },
+};
 
-  // Validate inventory
-  validate: (id: number) => api.put(`/inventorys/validateInventory/${id}`),
+export interface LogisticDailyStat {
+  date: string;
+  nb_shipments: number;
+  nb_transfers: number;
+  nb_receptions: number;
+}
 
-  // Get inventory lines
-  getLines: (id: number) => api.get(`/inventorys/${id}/lines`),
+export interface DailyStat {
+  date: string;
+  nbr_orders: number;
+  nbr_purchases: number;
+}
 
-  // Delete inventory
-  delete: (id: number) => api.delete(`/inventorys/deleteInventory/${id}`),
+export interface StatisticsDTO {
+  userCount: number;
+  clientCount: number;
+  supplierCount: number;
+  warehouseCount: number;
+}
 
-  uploadFile: async (inventoryId: number, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file); // Make sure the parameter name matches backend (@RequestParam("file"))
-    
-    try {
-      const response = await api.post(`/inventorys/uploadFile/${inventoryId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
-    }
-  },
+// Dashboard API endpoints
+export const dashboardApi = {
+  getLogisticsStats: () => axiosInstance.get<LogisticDailyStat[]>('/dashboard/logistics'),
+  getWeeklyOrdersAndPurchases: () => axiosInstance.get<DailyStat[]>('/dashboard/weekly-orders-purchases'),
+  getStatistics: () => axiosInstance.get<StatisticsDTO>('/dashboard/statistics'),
 };
 
 

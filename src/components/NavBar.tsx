@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,32 +17,42 @@ import {
   ShoppingCart,
   ShoppingBag,
   MoveHorizontal,
-  ClipboardList
+  ClipboardList,
+  LayoutDashboard,
+  Scale
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { authService } from '@/lib/auth';
 
 const NavBar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const isMobile = useIsMobile();
+  const user = authService.getUserData();
 
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: <FileText size={20} /> },
-    { name: 'Users', path: '/users', icon: <User size={20} /> },
-    { name: 'Clients', path: '/clients', icon: <Users size={20} /> },
-    { name: 'Suppliers', path: '/suppliers', icon: <Users size={20} /> },
-    { name: 'Warehouses', path: '/warehouses', icon: <Warehouse size={20} /> },
-    { name: 'Stock', path: '/stock', icon: <Boxes size={20} /> },
-    { name: 'Products', path: '/products', icon: <Package size={20} /> },
-    { name: 'Inventory', path: '/inventories', icon: <ClipboardList size={20} /> },
-    { name: 'Orders', path: '/orders', icon: <ShoppingCart size={20} /> },
-    { name: 'Purchases', path: '/purchases', icon: <ShoppingBag size={20} /> },
-    { name: 'Shipments', path: '/shipments', icon: <Truck size={20} /> },
-    { name: 'Receptions', path: '/receptions', icon: <PackageOpen size={20} /> },
-    { name: 'Transfers', path: '/transfers', icon: <MoveHorizontal size={20} /> },
+  const allNavItems = [
+    { name: 'Dashboard', path: '/dashboard', icon: <FileText size={20} />, requiresAdmin: false },
+    { name: 'Users', path: '/users', icon: <User size={20} />, requiresAdmin: true },
+    { name: 'Clients', path: '/clients', icon: <Users size={20} />, requiresAdmin: false },
+    { name: 'Suppliers', path: '/suppliers', icon: <Users size={20} />, requiresAdmin: false },
+    { name: 'Warehouses', path: '/warehouses', icon: <Warehouse size={20} />, requiresAdmin: true },
+    { name: 'Stock', path: '/stock', icon: <Boxes size={20} />, requiresAdmin: false },
+    { name: 'Products', path: '/products', icon: <Package size={20} />, requiresAdmin: false },
+    { name: 'Units', path: '/units', icon: <Scale size={20} />, requiresAdmin: false },
+    { name: 'Inventory', path: '/inventories', icon: <ClipboardList size={20} />, requiresAdmin: false },
+    { name: 'Orders', path: '/orders', icon: <ShoppingCart size={20} />, requiresAdmin: false },
+    { name: 'Purchases', path: '/purchases', icon: <ShoppingBag size={20} />, requiresAdmin: false },
+    { name: 'Shipments', path: '/shipments', icon: <Truck size={20} />, requiresAdmin: false },
+    { name: 'Receptions', path: '/receptions', icon: <PackageOpen size={20} />, requiresAdmin: false },
+    { name: 'Transfers', path: '/transfers', icon: <MoveHorizontal size={20} />, requiresAdmin: false },
   ];
+
+  const navItems = useMemo(() => {
+    const isAdmin = user?.role === 'ADMIN';
+    return allNavItems.filter(item => !item.requiresAdmin || isAdmin);
+  }, [user]);
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -52,7 +62,7 @@ const NavBar = () => {
     setIsCollapsed(!isCollapsed);
   };
 
-  const NavLink = ({ item }: { item: typeof navItems[0] }) => {
+  const NavLink = ({ item }: { item: typeof allNavItems[0] }) => {
     const isActive = location.pathname === item.path;
     return (
       <Link 
@@ -134,7 +144,10 @@ const NavBar = () => {
                 "flex items-center gap-2 px-4 py-2 rounded-md hover:bg-gray-100 text-gray-600",
                 isCollapsed && "lg:justify-center lg:px-2"
               )}
-              onClick={() => isMobile && setIsOpen(false)}
+              onClick={() => {
+                authService.logout();
+                isMobile && setIsOpen(false);
+              }}
             >
               <User size={20} />
               <span className={cn(isCollapsed && "lg:hidden")}>Logout</span>

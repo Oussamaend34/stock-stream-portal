@@ -57,11 +57,27 @@ const ShipmentForm = ({
   // State for form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // State for product search
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [isProductSearching, setIsProductSearching] = useState(false);
+  const [productSearchResults, setProductSearchResults] = useState<Product[]>([]);
+  const productSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Fetch warehouses
   const { data: warehouses, isLoading: isLoadingWarehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: async () => {
       const response = await warehouseApi.getAll();
+      return response.data;
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // Fetch units
+  const { data: units, isLoading: isLoadingUnits } = useQuery({
+    queryKey: ['units'],
+    queryFn: async () => {
+      const response = await unitApi.getAll();
       return response.data;
     },
     refetchOnWindowFocus: false
@@ -110,6 +126,58 @@ const ShipmentForm = ({
     }
   };
 
+  // Handle product search
+  const handleProductSearch = (term: string) => {
+    setProductSearchTerm(term);
+    setIsProductSearching(true);
+
+    // Clear previous timeout
+    if (productSearchTimeoutRef.current) {
+      clearTimeout(productSearchTimeoutRef.current);
+    }
+
+    // Set new timeout for search
+    productSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await productApi.search(term);
+        console.log('Search results:', response.data); // Debug log
+        setProductSearchResults(response.data.items || []); // Assuming the API returns items array
+      } catch (error) {
+        console.error('Error searching products:', error);
+        setProductSearchResults([]);
+      } finally {
+        setIsProductSearching(false);
+      }
+    }, 300);
+  };
+
+  // Handle product selection
+  const handleProductSelect = (product: Product) => {
+    console.log('Selected product:', product); // Debug log
+    setFormData(prev => ({
+      ...prev,
+      productId: product.id,
+      productName: product.name
+    }));
+    setProductSearchResults([]);
+    setProductSearchTerm('');
+  };
+
+  // Handle product input focus
+  const handleProductFocus = () => {
+    if (!productSearchTerm) {
+      setProductSearchResults([]);
+    }
+  };
+
+  // Handle product input blur
+  const handleProductBlur = () => {
+    // Delay hiding results to allow for click events
+    setTimeout(() => {
+      setProductSearchResults([]);
+    }, 200);
+  };
+
   // Validate form before submission
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -141,8 +209,8 @@ const ShipmentForm = ({
     if (validateForm()) {
       const submitData: ShipmentCreationRequest = {
         shipmentDate: formData.shipmentDate,
-        productId: item?.productId || 0,  // Use correct product ID
-        unitId: item?.unitId || 0,        // Use correct unit ID
+        productId: formData.productId,  // Use form data product ID
+        unitId: formData.unitId,        // Use form data unit ID
         warehouseId: formData.warehouseId,
         quantity: formData.quantity,
         remarks: formData.remarks,
@@ -178,26 +246,104 @@ const ShipmentForm = ({
             )}
           </div>
 
-          {/* Product Name - Read Only */}
+          {/* Product Selection */}
           <div className="space-y-2">
             <Label htmlFor="product">Product</Label>
-            <Input
-              id="product"
-              value={formData.productName}
-              readOnly
-              className="bg-gray-50"
-            />
+            {orderId ? (
+              <Input
+                id="product"
+                value={formData.productName}
+                readOnly
+                className="bg-gray-50"
+              />
+            ) : (
+              <div className="relative">
+                <div className="flex items-center">
+                  <Input
+                    id="product"
+                    value={productSearchTerm || formData.productName}
+                    onChange={(e) => handleProductSearch(e.target.value)}
+                    onFocus={handleProductFocus}
+                    onBlur={handleProductBlur}
+                    placeholder="Search for a product"
+                    className={errors.productId ? 'border-red-500' : ''}
+                    autoComplete="off"
+                  />
+                  {isProductSearching && (
+                    <div className="absolute right-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  {productSearchTerm && productSearchResults.length > 0 && (
+                    <div 
+                      className="absolute z-50 w-full mt-1 bg-white rounded-md border border-gray-200 shadow-lg max-h-[200px] overflow-y-auto" 
+                    >
+                      {productSearchResults.map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none flex items-center justify-between"
+                          onClick={() => handleProductSelect(product)}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          <span className="text-sm font-medium">{product.name}</span>
+                          {product.description && (
+                            <span className="text-xs text-gray-500 truncate ml-2">{product.description}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {productSearchTerm && !isProductSearching && productSearchResults.length === 0 && (
+                    <div className="absolute z-50 w-full mt-1 rounded-md border border-gray-200 bg-white p-2 text-center text-sm text-gray-500 shadow-lg">
+                      No products found
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {errors.productId && (
+              <p className="text-xs text-red-500">{errors.productId}</p>
+            )}
+            {formData.productId > 0 && (
+              <p className="text-sm text-gray-500">
+                Selected: {formData.productName}
+              </p>
+            )}
           </div>
 
-          {/* Unit - Read Only - Replace the existing unit select with this */}
+          {/* Unit Selection */}
           <div className="space-y-2">
             <Label htmlFor="unit">Unit</Label>
-            <Input
-              id="unit"
-              value={formData.unitName}
-              readOnly
-              className="bg-gray-50"
-            />
+            {orderId ? (
+              <Input
+                id="unit"
+                value={formData.unitName}
+                readOnly
+                className="bg-gray-50"
+              />
+            ) : (
+              <Select
+                value={formData.unitId.toString()}
+                onValueChange={(value) => handleChange('unitId', parseInt(value))}
+              >
+                <SelectTrigger className={errors.unitId ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select a unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units?.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.id.toString()}>
+                      {unit.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {errors.unitId && (
+              <p className="text-xs text-red-500">{errors.unitId}</p>
+            )}
           </div>
 
           {/* Warehouse Selection */}

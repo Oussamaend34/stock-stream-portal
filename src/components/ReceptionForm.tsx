@@ -124,23 +124,19 @@ const ReceptionForm = ({
   // Handle product search
   const handleProductSearch = (term: string) => {
     setProductSearchTerm(term);
+    setIsProductSearching(true);
 
     // Clear previous timeout
     if (productSearchTimeoutRef.current) {
       clearTimeout(productSearchTimeoutRef.current);
     }
 
-    if (term.trim().length < 2) {
-      setProductSearchResults([]);
-      return;
-    }
-
-    // Set a timeout to avoid too many API calls
+    // Set new timeout for search
     productSearchTimeoutRef.current = setTimeout(async () => {
-      setIsProductSearching(true);
       try {
         const response = await productApi.search(term);
-        setProductSearchResults(response.data.items);
+        console.log('Search results:', response.data); // Debug log
+        setProductSearchResults(response.data.items || []); // Assuming the API returns items array
       } catch (error) {
         console.error('Error searching products:', error);
         setProductSearchResults([]);
@@ -315,26 +311,114 @@ const ReceptionForm = ({
             </div>
           )}
 
-          {/* Product Name - Read Only when from purchase */}
+          {/* Product Search */}
           <div className="space-y-2">
             <Label htmlFor="product">Product</Label>
-            <Input
-              id="product"
-              value={formData.productName}
-              readOnly={!!purchaseId}
-              className={purchaseId ? 'bg-gray-50' : ''}
-            />
+            <div className="relative">
+              <div className="flex items-center">
+                <Input
+                  id="product"
+                  value={productSearchTerm}
+                  onChange={(e) => handleProductSearch(e.target.value)}
+                  placeholder="Search for a product"
+                  className={errors.productId ? 'border-red-500 pr-10' : 'pr-10'}
+                  autoComplete="off"
+                  readOnly={formData.productId > 0}
+                />
+                {isProductSearching ? (
+                  <div className="absolute right-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                  </div>
+                ) : (
+                  <Search className="h-4 w-4 absolute right-3 text-gray-400" />
+                )}
+              </div>
+
+              {/* Selected product display */}
+              {formData.productId > 0 && formData.productName && (
+                <div className="mt-2 p-2 bg-blue-50 rounded-md flex justify-between items-center">
+                  <span className="text-sm font-medium">{formData.productName}</span>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        productId: 0,
+                        productName: ''
+                      }));
+                      setProductSearchTerm('');
+                    }}
+                  >
+                    ×
+                  </Button>
+                </div>
+              )}
+
+              {/* Search results dropdown */}
+              {!formData.productId && productSearchTerm && productSearchResults.length > 0 && (
+                <div 
+                  className="absolute z-50 w-full mt-1 bg-white rounded-md border border-gray-200 shadow-lg max-h-[200px] overflow-y-auto"
+                >
+                  {productSearchResults.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none flex items-center justify-between"
+                      onClick={() => handleProductSelect(product)}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <span className="text-sm font-medium">{product.name}</span>
+                      {product.description && (
+                        <span className="text-xs text-gray-500 truncate ml-2">{product.description}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!formData.productId && productSearchTerm && !isProductSearching && productSearchResults.length === 0 && (
+                <div className="absolute z-50 w-full mt-1 rounded-md border border-gray-200 bg-white p-2 text-center text-sm text-gray-500 shadow-lg">
+                  No products found
+                </div>
+              )}
+            </div>
+            {errors.productId && (
+              <p className="text-xs text-red-500">{errors.productId}</p>
+            )}
           </div>
 
-          {/* Unit - Read Only when from purchase */}
+          {/* Unit Selection */}
           <div className="space-y-2">
-            <Label htmlFor="unit">Unit</Label>
-            <Input
-              id="unit"
-              value={formData.unitName}
-              readOnly={!!purchaseId}
-              className={purchaseId ? 'bg-gray-50' : ''}
-            />
+            <Label htmlFor="unitId">Unit</Label>
+            {isLoadingUnits ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-gray-500">Loading units...</span>
+              </div>
+            ) : units && units.length > 0 ? (
+              <Select
+                value={formData.unitId?.toString()}
+                onValueChange={(value) => handleChange('unitId', parseInt(value))}
+                disabled={!formData.productId}
+              >
+                <SelectTrigger className={errors.unitId ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select a unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.id.toString()}>
+                      {unit.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="text-sm text-gray-500">No units available</div>
+            )}
+            {errors.unitId && (
+              <p className="text-xs text-red-500">{errors.unitId}</p>
+            )}
           </div>
 
           {/* Warehouse Selection */}
@@ -375,11 +459,12 @@ const ReceptionForm = ({
             <Input
               id="quantity"
               type="number"
-              value={formData.quantity}
+              value={formData.quantity || ''}
               onChange={(e) => handleChange('quantity', parseInt(e.target.value) || 0)}
               placeholder="Enter quantity"
               min="1"
               className={errors.quantity ? 'border-red-500' : ''}
+              disabled={!formData.productId}
             />
             {errors.quantity && (
               <p className="text-xs text-red-500">{errors.quantity}</p>

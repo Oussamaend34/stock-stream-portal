@@ -143,23 +143,19 @@ const PurchaseForm = ({
   // Handle product search
   const handleProductSearch = (term: string) => {
     setProductSearchTerm(term);
+    setIsProductSearching(true);
 
     // Clear previous timeout
     if (productSearchTimeoutRef.current) {
       clearTimeout(productSearchTimeoutRef.current);
     }
 
-    if (term.trim().length < 2) {
-      setProductSearchResults([]);
-      return;
-    }
-
-    // Set a timeout to avoid too many API calls
+    // Set new timeout for search
     productSearchTimeoutRef.current = setTimeout(async () => {
-      setIsProductSearching(true);
       try {
         const response = await productApi.search(term);
-        setProductSearchResults(response.data.items);
+        console.log('Search results:', response.data); // Debug log
+        setProductSearchResults(response.data.items || []); // Assuming the API returns items array
       } catch (error) {
         console.error('Error searching products:', error);
         setProductSearchResults([]);
@@ -444,9 +440,13 @@ const PurchaseForm = ({
                       onChange={(e) => handleProductSearch(e.target.value)}
                       placeholder="Search for a product"
                       className={errors.item_productId ? 'border-red-500 pr-10' : 'pr-10'}
+                      autoComplete="off"
+                      readOnly={currentItem.productId > 0}
                     />
                     {isProductSearching ? (
-                      <Loader2 className="h-4 w-4 animate-spin absolute right-3" />
+                      <div className="absolute right-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                      </div>
                     ) : (
                       <Search className="h-4 w-4 absolute right-3 text-gray-400" />
                     )}
@@ -466,6 +466,7 @@ const PurchaseForm = ({
                             productId: 0,
                             productName: ''
                           }));
+                          setProductSearchTerm('');
                         }}
                       >
                         ×
@@ -474,19 +475,29 @@ const PurchaseForm = ({
                   )}
 
                   {/* Search results dropdown */}
-                  {productSearchResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
-                      <ul className="py-1">
-                        {productSearchResults.map(product => (
-                          <li 
-                            key={product.id}
-                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                            onClick={() => handleProductSelect(product)}
-                          >
-                            {product.name}
-                          </li>
-                        ))}
-                      </ul>
+                  {!currentItem.productId && productSearchTerm && productSearchResults.length > 0 && (
+                    <div 
+                      className="absolute z-50 w-full mt-1 bg-white rounded-md border border-gray-200 shadow-lg max-h-[200px] overflow-y-auto"
+                    >
+                      {productSearchResults.map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none flex items-center justify-between"
+                          onClick={() => handleProductSelect(product)}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          <span className="text-sm font-medium">{product.name}</span>
+                          {product.description && (
+                            <span className="text-xs text-gray-500 truncate ml-2">{product.description}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!currentItem.productId && productSearchTerm && !isProductSearching && productSearchResults.length === 0 && (
+                    <div className="absolute z-50 w-full mt-1 rounded-md border border-gray-200 bg-white p-2 text-center text-sm text-gray-500 shadow-lg">
+                      No products found
                     </div>
                   )}
                 </div>
@@ -509,6 +520,7 @@ const PurchaseForm = ({
                     <Select
                       value={currentItem.unitId.toString()}
                       onValueChange={(value) => handleItemChange('unitId', parseInt(value))}
+                      disabled={!currentItem.productId}
                     >
                       <SelectTrigger className={errors.item_unitId ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Select a unit" />
@@ -540,6 +552,7 @@ const PurchaseForm = ({
                     placeholder="Enter quantity"
                     min="1"
                     className={errors.item_quantity ? 'border-red-500' : ''}
+                    disabled={!currentItem.productId}
                   />
                   {errors.item_quantity && (
                     <p className="text-xs text-red-500">{errors.item_quantity}</p>
