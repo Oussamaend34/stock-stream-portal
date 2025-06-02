@@ -57,6 +57,14 @@ export const router = createBrowserRouter([
         element: <StockManagement />
       },
       {
+        path: 'stock/low-stock',
+        element: <StockManagement />
+      },
+      {
+        path: 'stock/advanced-filter',
+        element: <StockManagement />
+      },
+      {
         path: 'orders',
         element: <OrderManagement />
       },
