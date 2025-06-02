@@ -26,9 +26,20 @@ const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
-    }
+    const scrollToBottom = () => {
+      if (scrollAreaRef.current) {
+        const scrollArea = scrollAreaRef.current;
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
+    };
+    
+    // Scroll immediately
+    scrollToBottom();
+    
+    // Also scroll after a short delay to handle any layout shifts
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [messages]);
 
   const handleSendMessage = async () => {
@@ -70,6 +81,13 @@ const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMessage]);
+
+      // Ensure scroll to bottom after bot response
+      setTimeout(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      }, 100);
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');

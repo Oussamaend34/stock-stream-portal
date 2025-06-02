@@ -290,8 +290,13 @@ const ProductManagement = () => {
           toast.success(`Product has been deleted successfully`);
           setDeleteDialogOpen(false);
         },
-        onError: (error) => {
-          toast.error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        onError: (error: any) => {
+          if (error.response?.status === 404) {
+            toast.error(`The product you're trying to delete no longer exists`);
+          } else {
+            toast.error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          setDeleteDialogOpen(false);
         }
       });
     }
@@ -304,8 +309,12 @@ const ProductManagement = () => {
           toast.success(`Product has been created successfully`);
           setFormOpen(false);
         },
-        onError: (error) => {
-          toast.error(`Failed to create product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        onError: (error: any) => {
+          if (error.response?.status === 409) {
+            toast.error(`A product with the name "${product.name}" already exists`);
+          } else {
+            toast.error(`Failed to create product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }
       });
     } else if (currentProduct && currentProduct.id) {
@@ -314,8 +323,14 @@ const ProductManagement = () => {
           toast.success(`Product has been updated successfully`);
           setFormOpen(false);
         },
-        onError: (error) => {
-          toast.error(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        onError: (error: any) => {
+          if (error.response?.status === 409) {
+            toast.error(`A product with the name "${product.name}" already exists`);
+          } else if (error.response?.status === 404) {
+            toast.error(`The product you're trying to update no longer exists`);
+          } else {
+            toast.error(`Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }
       });
     }

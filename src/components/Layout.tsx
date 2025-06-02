@@ -16,7 +16,7 @@ const Layout = () => {
       </main>
       
       <ChatButton />
-      <Toaster position="top-right" />
+      <Toaster position="top-center" />
     </div>
   );
 };

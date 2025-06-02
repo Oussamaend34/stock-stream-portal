@@ -37,7 +37,8 @@ import {
   Warehouse as WarehouseIcon,
   FileText,
   User,
-  Download
+  Download,
+  AlertTriangle
 } from 'lucide-react';
 import ShipmentForm, { ShipmentFormData } from '@/components/ShipmentForm';
 import { toast } from 'sonner';
@@ -78,6 +79,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import ShipmentEditForm from '@/components/ShipmentEditForm';
 
 const ShipmentManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -182,8 +184,10 @@ const ShipmentManagement = () => {
 
   // Update shipment mutation
   const updateShipmentMutation = useMutation({
-    mutationFn: ({ id, shipmentData }: { id: number, shipmentData: ShipmentCreationRequest }) => 
-      shipmentApi.update(id, shipmentData),
+    mutationFn: async ({ id, quantity }: { id: number; quantity: number }) => {
+      const response = await shipmentApi.update(id, quantity);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
     }
@@ -286,18 +290,7 @@ const ShipmentManagement = () => {
 
   const handleEdit = (shipment: ShipmentDTO) => {
     setFormMode('edit');
-    // Convert ShipmentDTO to ShipmentFormData
-    const formData: ShipmentFormData = {
-      id: shipment.id,
-      shipmentDate: shipment.shipmentDate,
-      productId: 0, // We'll need to fetch the actual product ID
-      productName: shipment.product,
-      unitId: 0, // We'll need to fetch the actual unit ID
-      warehouseId: 0, // We'll need to fetch the actual warehouse ID
-      quantity: shipment.quantity,
-      remarks: shipment.remarks || '',
-    };
-    setCurrentShipment(formData);
+    setCurrentShipment(shipment);
     setFormOpen(true);
   };
 
@@ -342,20 +335,22 @@ const ShipmentManagement = () => {
           toast.error(`Failed to create shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       });
-    } else if (currentShipment && currentShipment.id) {
-      updateShipmentMutation.mutate({ id: currentShipment.id, shipmentData: shipment }, {
-        onSuccess: () => {
-          toast.success(`Shipment has been updated successfully`);
-          setFormOpen(false);
-        },
-        onError: (error) => {
-          toast.error(`Failed to update shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      });
     }
   };
 
-  const getStatusBadgeClass = (status: Shipment['status']) => {
+  const handleQuantityUpdate = (id: number, quantity: number) => {
+    updateShipmentMutation.mutate({ id, quantity }, {
+      onSuccess: () => {
+        toast.success(`Shipment quantity has been updated successfully`);
+        setFormOpen(false);
+      },
+      onError: (error) => {
+        toast.error(`Failed to update shipment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
+  };
+
+  const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'PREPARING':
         return 'bg-yellow-100 text-yellow-800';
@@ -722,13 +717,24 @@ const ShipmentManagement = () => {
         </Card>
       </div>
 
-      <ShipmentForm 
-        open={formOpen} 
-        onOpenChange={setFormOpen} 
-        onSubmit={handleFormSubmit} 
-        shipment={currentShipment}
-        mode={formMode}
-      />
+      {formMode === 'create' ? (
+        <ShipmentForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          onSubmit={handleFormSubmit}
+          mode="create"
+          isLoading={createShipmentMutation.isPending}
+        />
+      ) : (
+        <ShipmentEditForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          onSubmit={handleQuantityUpdate}
+          shipmentId={currentShipment?.id || 0}
+          currentQuantity={currentShipment?.quantity || 0}
+          isLoading={updateShipmentMutation.isPending}
+        />
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

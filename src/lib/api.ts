@@ -136,23 +136,27 @@ export interface ShipmentDTO {
   id: number;
   shipmentDate: string; // ISO date string format
   quantity: number;
-  product: string;
-  unit: string;
-  warehouse: string;
+  product: string;  // This is the product name
+  unit: string;     // This is the unit name
+  warehouse: string; // This is the warehouse name
   remarks: string;
   orderReference: string | null;
   clientName: string | null;
+  productId?: number;
+  unitId?: number;
+  warehouseId?: number;
+  orderId?: number | null;
 }
 
 // Shipment Creation Request type
 export interface ShipmentCreationRequest {
-  shipmentDate: string; // ISO date string format
-  productId: number;
-  unitId: number;
-  warehouseId: number;
+  shipmentDate?: string; // Optional for edit mode
+  productId?: number;    // Optional for edit mode
+  unitId?: number;       // Optional for edit mode
+  warehouseId?: number;  // Optional for edit mode
   orderId?: number | null; // Optional as per requirements
-  remarks: string;
-  quantity: number;
+  remarks?: string;      // Optional for edit mode
+  quantity: number;      // Only required field for both create and edit
 }
 
 // For type safety
@@ -160,11 +164,17 @@ export type ShipmentsContainer = Container<ShipmentDTO>;
 
 // Shipment API endpoints
 export const shipmentApi = {
-  getAll: (page = 1, size = 10) => axiosInstance.get(`/shipments?page=${page}&size=${size}`),
-  getById: (id: number) => axiosInstance.get(`/shipments/${id}`),
-  create: (shipmentData: ShipmentCreationRequest) => axiosInstance.post('/shipments', shipmentData),
-  update: (id: number, shipmentData: any) => axiosInstance.put(`/shipments/${id}`, shipmentData),
-  delete: (id: number) => axiosInstance.delete(`/shipments/${id}`),
+  getAll: () => axiosInstance.get<ShipmentsContainer>('/shipments'),
+  getAllPaginated: (page: number, size: number) => 
+    axiosInstance.get<ShipmentsContainer>(`/shipments?page=${page}&size=${size}`),
+  create: (shipment: ShipmentCreationRequest) => 
+    axiosInstance.post<ShipmentDTO>('/shipments', shipment),
+  update: (id: number, quantity: number) => 
+    axiosInstance.put<ShipmentDTO>(`/shipments/${id}?quantity=${quantity}`),
+  delete: (id: number) => 
+    axiosInstance.delete(`/shipments/${id}`),
+  getById: (id: number) => 
+    axiosInstance.get<ShipmentDTO>(`/shipments/${id}`)
 };
 
 // Reception API types
@@ -199,7 +209,7 @@ export const receptionApi = {
   getAll: (page = 1, size = 10) => axiosInstance.get(`/receptions?page=${page}&size=${size}`),
   getById: (id: number) => axiosInstance.get(`/receptions/${id}`),
   create: (receptionData: ReceptionCreationRequest) => axiosInstance.post('/receptions', receptionData),
-  update: (id: number, receptionData: any) => axiosInstance.put(`/receptions/${id}`, receptionData),
+  update: (id: number, quantity: number) => axiosInstance.put(`/receptions/${id}?quantity=${quantity}`),
   delete: (id: number) => axiosInstance.delete(`/receptions/${id}`),
 };
 
@@ -321,7 +331,9 @@ export const productApi = {
   create: (productData: { name: string, description: string }) => axiosInstance.post('/products', null, {
     params: productData
   }),
-  update: (id: number, productData: { name: string, description: string }) => axiosInstance.put(`/products/${id}`, productData),
+  update: (id: number, productData: { name: string, description: string }) => axiosInstance.put(`/products/${id}`, null, {
+    params: productData
+  }),
   delete: (id: number) => axiosInstance.delete(`/products/${id}`),
 };
 

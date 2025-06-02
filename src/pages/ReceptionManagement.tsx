@@ -79,6 +79,8 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { unitApi } from '@/lib/api';
+import { warehouseApi } from '@/lib/api';
 
 const ReceptionManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -123,6 +125,23 @@ const ReceptionManagement = () => {
     },
     enabled: !!selectedReceptionId,
     refetchOnWindowFocus: false
+  });
+
+  // Add new queries for units and warehouses
+  const { data: allUnits } = useQuery({
+    queryKey: ['units'],
+    queryFn: async () => {
+      const response = await unitApi.getAll();
+      return response.data;
+    }
+  });
+
+  const { data: allWarehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const response = await warehouseApi.getAll();
+      return response.data;
+    }
   });
 
   // Handle success and error states
@@ -183,7 +202,7 @@ const ReceptionManagement = () => {
   // Update reception mutation
   const updateReceptionMutation = useMutation({
     mutationFn: ({ id, receptionData }: { id: number, receptionData: ReceptionCreationRequest }) => 
-      receptionApi.update(id, receptionData),
+      receptionApi.update(id, receptionData.quantity),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receptions'] });
     }
@@ -286,16 +305,27 @@ const ReceptionManagement = () => {
 
   const handleEdit = (reception: ReceptionDTO) => {
     setFormMode('edit');
-    // Convert ReceptionDTO to ReceptionFormData
+    
+    // Find the unit ID based on the unit name
+    const unitId = allUnits?.find(u => u.name === reception.unit)?.id || 0;
+    
+    // Find the warehouse ID based on the warehouse name
+    const warehouseId = allWarehouses?.find(w => w.name === reception.warehouse)?.id || 0;
+    
+    // Convert ReceptionDTO to ReceptionFormData with all necessary fields
     const formData: ReceptionFormData = {
       id: reception.id,
       receptionDate: reception.receptionDate,
-      productId: 0, // We'll need to fetch the actual product ID
+      productId: reception.productId || 0,
       productName: reception.product,
-      unitId: 0, // We'll need to fetch the actual unit ID
-      warehouseId: 0, // We'll need to fetch the actual warehouse ID
+      unitId: unitId,
+      unitName: reception.unit,
+      warehouseId: warehouseId,
       quantity: reception.quantity,
       remarks: reception.remarks || '',
+      purchaseReference: reception.purchaseReference || '',
+      supplierName: reception.supplierName || '',
+      purchaseId: null // Since we don't have this in the DTO
     };
     setCurrentReception(formData);
     setFormOpen(true);

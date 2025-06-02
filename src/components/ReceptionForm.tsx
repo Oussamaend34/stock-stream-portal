@@ -94,7 +94,34 @@ const ReceptionForm = ({
   // Initialize form with reception data when editing
   useEffect(() => {
     if (reception && mode === 'edit') {
-      setFormData(reception);
+      setFormData({
+        receptionDate: reception.receptionDate || format(new Date(), 'yyyy-MM-dd'),
+        productId: reception.productId || 0,
+        productName: reception.productName || '',
+        unitId: reception.unitId || 0,
+        unitName: reception.unitName || '',
+        warehouseId: reception.warehouseId || 0,
+        quantity: reception.quantity || 1,
+        remarks: reception.remarks || '',
+        purchaseId: reception.purchaseId || null,
+        purchaseReference: reception.purchaseReference || '',
+        supplierName: reception.supplierName || ''
+      });
+    } else if (mode === 'fromPurchase' && item) {
+      // Set form data from purchase item
+      setFormData({
+        receptionDate: format(new Date(), 'yyyy-MM-dd'),
+        productId: item.productId,
+        productName: item.productName,
+        unitId: item.unitId,
+        unitName: item.unit,
+        quantity: item.quantity,
+        warehouseId: 0, // Will be set by warehouse useEffect
+        remarks: '',
+        purchaseId: purchaseId,
+        purchaseReference: purchaseReference,
+        supplierName: supplierName
+      });
     } else {
       // Reset form for create mode
       setFormData({
@@ -102,24 +129,27 @@ const ReceptionForm = ({
         productId: 0,
         productName: '',
         unitId: 0,
+        unitName: '',
         warehouseId: 0,
         quantity: 1,
         remarks: '',
-        purchaseId: undefined
+        purchaseId: null,
+        purchaseReference: '',
+        supplierName: ''
       });
     }
-  }, [reception, mode, open]);
+  }, [reception, mode, open, item, purchaseId, purchaseReference, supplierName]);
 
-  // Set default warehouseId when warehouses are loaded
+  // Remove the useEffect for setting default unitId since we handle it in form initialization
   useEffect(() => {
-    if (warehouses && warehouses.length > 0 && formData.warehouseId === 0) {
-      // Set the first warehouse as default
+    if (warehouses && warehouses.length > 0 && formData.warehouseId === 0 && mode !== 'edit') {
+      // Set the first warehouse as default only in create mode
       setFormData(prev => ({
         ...prev,
         warehouseId: warehouses[0].id
       }));
     }
-  }, [warehouses, formData.warehouseId]);
+  }, [warehouses, formData.warehouseId, mode]);
 
   // Handle product search
   const handleProductSearch = (term: string) => {
@@ -178,75 +208,46 @@ const ReceptionForm = ({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.receptionDate) {
-      newErrors.receptionDate = 'Reception date is required';
-    }
+    if (mode === 'edit') {
+      if (!formData.quantity || formData.quantity <= 0) {
+        newErrors.quantity = 'Quantity must be greater than zero';
+      }
+    } else {
+      if (!formData.receptionDate) {
+        newErrors.receptionDate = 'Reception date is required';
+      }
 
-    if (!formData.productId || formData.productId <= 0) {
-      newErrors.productId = 'Product is required';
-    }
+      if (!formData.productId || formData.productId <= 0) {
+        newErrors.productId = 'Product is required';
+      }
 
-    if (!formData.unitId || formData.unitId <= 0) {
-      newErrors.unitId = 'Unit is required';
-    }
+      if (!formData.unitId || formData.unitId <= 0) {
+        newErrors.unitId = 'Unit is required';
+      }
 
-    if (!formData.warehouseId || formData.warehouseId <= 0) {
-      newErrors.warehouseId = 'Warehouse is required';
-    }
+      if (!formData.warehouseId || formData.warehouseId <= 0) {
+        newErrors.warehouseId = 'Warehouse is required';
+      }
 
-    // Purchase validation removed as per requirements
-
-    if (!formData.quantity || formData.quantity <= 0) {
-      newErrors.quantity = 'Quantity must be greater than zero';
+      if (!formData.quantity || formData.quantity <= 0) {
+        newErrors.quantity = 'Quantity must be greater than zero';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Update the useEffect to handle form reset properly
-  useEffect(() => {
-    if (!open) {
-      // Reset form when dialog closes
-      setFormData({
-        receptionDate: format(new Date(), 'yyyy-MM-dd'),
-        productId: 0,
-        productName: '',
-        unitId: 0,
-        warehouseId: 0,
-        quantity: 1,
-        remarks: '',
-        purchaseId: null,
-        purchaseReference: '',
-        supplierName: ''
-      });
-      setErrors({});
-    } else if (mode === 'fromPurchase' && item) {
-      // Set form data from purchase item
-      setFormData({
-        receptionDate: format(new Date(), 'yyyy-MM-dd'),
-        productId: item.productId,
-        productName: item.productName,
-        unitId: item.unitId,
-        unitName: item.unit,
-        quantity: item.quantity,
-        warehouseId: 0, // Will be set by warehouse useEffect
-        remarks: '',
-        purchaseId: purchaseId,
-        purchaseReference: purchaseReference,
-        supplierName: supplierName
-      });
-    }
-  }, [open, item, mode, purchaseId, purchaseReference, supplierName]);
-
-  // Update the handleSubmit function to prevent double submission
+  // Update the handleSubmit function to only send quantity when editing
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (isLoading) return;
 
     if (validateForm()) {
-      const submitData: ReceptionCreationRequest = {
+      const submitData: ReceptionCreationRequest = mode === 'edit' ? {
+        quantity: formData.quantity
+      } : {
         receptionDate: formData.receptionDate,
         productId: formData.productId,
         unitId: formData.unitId,
@@ -279,6 +280,7 @@ const ReceptionForm = ({
               value={formData.receptionDate}
               onChange={(e) => handleChange('receptionDate', e.target.value)}
               className={errors.receptionDate ? 'border-red-500' : ''}
+              disabled={mode === 'edit'}
             />
             {errors.receptionDate && (
               <p className="text-xs text-red-500">{errors.receptionDate}</p>
@@ -318,12 +320,13 @@ const ReceptionForm = ({
               <div className="flex items-center">
                 <Input
                   id="product"
-                  value={productSearchTerm}
+                  value={mode === 'edit' ? formData.productName : productSearchTerm}
                   onChange={(e) => handleProductSearch(e.target.value)}
                   placeholder="Search for a product"
                   className={errors.productId ? 'border-red-500 pr-10' : 'pr-10'}
                   autoComplete="off"
-                  readOnly={formData.productId > 0}
+                  readOnly={mode === 'edit'}
+                  disabled={mode === 'edit'}
                 />
                 {isProductSearching ? (
                   <div className="absolute right-2">
@@ -338,26 +341,28 @@ const ReceptionForm = ({
               {formData.productId > 0 && formData.productName && (
                 <div className="mt-2 p-2 bg-blue-50 rounded-md flex justify-between items-center">
                   <span className="text-sm font-medium">{formData.productName}</span>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        productId: 0,
-                        productName: ''
-                      }));
-                      setProductSearchTerm('');
-                    }}
-                  >
-                    ×
-                  </Button>
+                  {mode !== 'edit' && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          productId: 0,
+                          productName: ''
+                        }));
+                        setProductSearchTerm('');
+                      }}
+                    >
+                      ×
+                    </Button>
+                  )}
                 </div>
               )}
 
               {/* Search results dropdown */}
-              {!formData.productId && productSearchTerm && productSearchResults.length > 0 && (
+              {!formData.productId && productSearchTerm && productSearchResults.length > 0 && mode !== 'edit' && (
                 <div 
                   className="absolute z-50 w-full mt-1 bg-white rounded-md border border-gray-200 shadow-lg max-h-[200px] overflow-y-auto"
                 >
@@ -375,11 +380,6 @@ const ReceptionForm = ({
                       )}
                     </button>
                   ))}
-                </div>
-              )}
-              {!formData.productId && productSearchTerm && !isProductSearching && productSearchResults.length === 0 && (
-                <div className="absolute z-50 w-full mt-1 rounded-md border border-gray-200 bg-white p-2 text-center text-sm text-gray-500 shadow-lg">
-                  No products found
                 </div>
               )}
             </div>
@@ -400,7 +400,7 @@ const ReceptionForm = ({
               <Select
                 value={formData.unitId?.toString()}
                 onValueChange={(value) => handleChange('unitId', parseInt(value))}
-                disabled={!formData.productId}
+                disabled={mode === 'edit'}
               >
                 <SelectTrigger className={errors.unitId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select a unit" />
@@ -433,6 +433,7 @@ const ReceptionForm = ({
               <Select
                 value={formData.warehouseId.toString()}
                 onValueChange={(value) => handleChange('warehouseId', parseInt(value))}
+                disabled={mode === 'edit'}
               >
                 <SelectTrigger className={errors.warehouseId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select a warehouse" />
@@ -464,7 +465,6 @@ const ReceptionForm = ({
               placeholder="Enter quantity"
               min="1"
               className={errors.quantity ? 'border-red-500' : ''}
-              disabled={!formData.productId}
             />
             {errors.quantity && (
               <p className="text-xs text-red-500">{errors.quantity}</p>
@@ -480,6 +480,7 @@ const ReceptionForm = ({
               onChange={(e) => handleChange('remarks', e.target.value)}
               placeholder="Enter any additional notes"
               className="resize-none"
+              disabled={mode === 'edit'}
             />
           </div>
 

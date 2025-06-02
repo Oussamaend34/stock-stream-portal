@@ -235,12 +235,22 @@ const UserManagement = () => {
   };
 
   const handleDeleteIntent = (user: UserType) => {
+    if (user.role === 'ADMIN') {
+      toast.error('Admin users cannot be deleted');
+      return;
+    }
     setCurrentUser(user);
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = () => {
     if (currentUser && currentUser.id) {
+      if (currentUser.role === 'ADMIN') {
+        toast.error('Admin users cannot be deleted');
+        setDeleteDialogOpen(false);
+        return;
+      }
+
       deleteUserMutation.mutate(currentUser.id, {
         onSuccess: () => {
           toast.success(`User ${currentUser.name} has been deleted`);
@@ -280,13 +290,8 @@ const UserManagement = () => {
         address: user.address
       };
 
-      // Set loading state if needed
-      // setCreating(true);
-
       createUserMutation.mutate(createData as UserType, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for user creation should be triggered
-          // Do not add additional toast.success calls anywhere else to avoid duplicate notifications
           toast.success(`User ${user.name} has been created`);
           setFormOpen(false);
           
@@ -300,16 +305,15 @@ const UserManagement = () => {
             setTotalPages(prev => Math.max(1, Math.ceil((totalElements + 1) / pageSize)));
           }
         },
-        onError: (error) => {
-          toast.error(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        },
-        // This is crucial - it ensures no other handlers will run
-        // The mutation will only use the callbacks defined here
-        onSettled: () => {
-          // setCreating(false);
+        onError: (error: any) => {
+          if (error.response?.status === 409) {
+            toast.error('A user with this email, CIN, or phone number already exists');
+          } else {
+            toast.error(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }
       });
-    } else if (user.id) {
+    } else {
       // For update, we can only modify name, phone, cin, and address
       // Role is intentionally omitted as it's not accepted by the API
       const updateData = {
@@ -321,8 +325,6 @@ const UserManagement = () => {
 
       updateUserMutation.mutate({ id: user.id, userData: updateData as UserType }, {
         onSuccess: () => {
-          // IMPORTANT: This is the ONLY place where toast notifications for user updates should be triggered
-          // Do not add additional toast.success calls anywhere else to avoid duplicate notifications
           toast.success(`User ${user.name} has been updated`);
           setFormOpen(false);
           
@@ -330,13 +332,12 @@ const UserManagement = () => {
           queryClient.invalidateQueries({ queryKey: ['users'] });
           queryClient.invalidateQueries({ queryKey: ['users-count'] });
         },
-        onError: (error) => {
-          toast.error(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        },
-        // This is crucial - it ensures no other handlers will run
-        // The mutation will only use the callbacks defined here
-        onSettled: () => {
-          // Any cleanup after update
+        onError: (error: any) => {
+          if (error.response?.status === 409) {
+            toast.error('A user with this CIN or phone number already exists');
+          } else {
+            toast.error(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }
       });
     }
